@@ -2,8 +2,13 @@ package main
 
 import (
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/github/kube-service-exporter/pkg/controller"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -20,20 +25,34 @@ func NewClientSet() (kubernetes.Interface, error) {
 }
 
 func main() {
-	namespaces := make([]string, 0, 5)
+	stoppedC := make(chan struct{})
 
 	cs, err := NewClientSet()
 	if err != nil {
 		log.Fatalf("Unable to acquire a clientset: %v", err)
 	}
 
-	nsList, err := cs.CoreV1().Namespaces().List(meta_v1.ListOptions{})
-	if err != nil {
-		log.Fatalf("Unable to list namespaces: %v", err)
-	}
+	sw := controller.NewServiceWatcher(cs, 15*time.Minute)
+	go sw.Run()
 
-	for _, ns := range nsList.Items {
-		namespaces = append(namespaces, ns.Name)
+	sigC := make(chan os.Signal, 1)
+	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
+	<-sigC
+	log.Println("Shutting down...")
+
+	go func() {
+		defer close(stoppedC)
+		sw.Stop()
+		log.Println("Stopped Service Watcher...")
+	}()
+
+	// make sure stops don't take too long
+	timer := time.NewTimer(5 * time.Second)
+	select {
+	case <-timer.C:
+		log.Println("goroutines too long to stop. Exiting.")
+	case <-stoppedC:
+		log.Println("Stopped.")
 	}
-	log.Printf("These are the namespaces: %v\n", namespaces)
+	os.Stdout.Sync()
 }
