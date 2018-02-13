@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+if [ "$(uname)" = "Darwin" ]; then
+  brew bundle
+fi

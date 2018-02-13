@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+docker build -f Dockerfile.build -t build-kube-health-proxy .
+
+docker run build-kube-health-proxy |
+  docker build -f Dockerfile.release -t kube-health-proxy -
