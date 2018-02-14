@@ -77,8 +77,7 @@ func (sw *ServiceWatcher) Run() {
 
 func (sw *ServiceWatcher) Stop() {
 	close(sw.stopC)
-	// wait until the handler-invoking goroutine has completed in case it
-	// has any transactional code.
+	// wait until the handlers have completed
 	sw.wg.Wait()
 }
 
@@ -86,19 +85,30 @@ func (sw *ServiceWatcher) addService(service *v1.Service) {
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	log.Printf("Add %s/%s", service.Namespace, service.Name)
+	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
+		return
+	}
+	exportedServices, _ := NewExportedServicesFromKubeService(*service)
+	log.Println("Add ", exportedServices)
 }
 
-func (sw *ServiceWatcher) updateService(old *v1.Service, new *v1.Service) {
+func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.Service) {
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	log.Printf("Update %s/%s -> %s/%s", old.Namespace, old.Name, new.Namespace, new.Name)
+	// Delete services that were changed from LoadBalancers to something else
+	if oldService.Spec.Type == v1.ServiceTypeLoadBalancer && newService.Spec.Type != v1.ServiceTypeLoadBalancer {
+		sw.deleteService(newService)
+	}
+	oldExportedServices, _ := NewExportedServicesFromKubeService(*oldService)
+	newExportedServices, _ := NewExportedServicesFromKubeService(*newService)
+	log.Printf("Update %v -> %v", oldExportedServices, newExportedServices)
 }
 
 func (sw *ServiceWatcher) deleteService(service *v1.Service) {
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	log.Printf("Delete %s/%s", service.Namespace, service.Name)
+	exportedServices, _ := NewExportedServicesFromKubeService(*service)
+	log.Printf("Delete %v", exportedServices)
 }
