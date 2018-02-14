@@ -86,20 +86,19 @@ func (sw *ServiceWatcher) addService(service *v1.Service) {
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	log.Println("Add ", service.Name)
-
+	log.Printf("Add %s/%s", service.Namespace, service.Name)
 }
 
 func (sw *ServiceWatcher) updateService(old *v1.Service, new *v1.Service) {
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	log.Println("Update ", old.Name, new.Name)
+	log.Printf("Update %s/%s -> %s/%s", old.Namespace, old.Name, new.Namespace, new.Name)
 }
 
 func (sw *ServiceWatcher) deleteService(service *v1.Service) {
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	log.Println("Delete ", service.Name)
+	log.Printf("Delete %s/%s", service.Namespace, service.Name)
 }
