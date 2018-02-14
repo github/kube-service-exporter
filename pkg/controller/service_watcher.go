@@ -89,7 +89,10 @@ func (sw *ServiceWatcher) addService(service *v1.Service) {
 		return
 	}
 	exportedServices, _ := NewExportedServicesFromKubeService(*service)
-	log.Println("Add ", exportedServices)
+
+	for _, es := range exportedServices {
+		log.Printf("Add %+v", es)
+	}
 }
 
 func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.Service) {
@@ -100,9 +103,10 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 	if oldService.Spec.Type == v1.ServiceTypeLoadBalancer && newService.Spec.Type != v1.ServiceTypeLoadBalancer {
 		sw.deleteService(newService)
 	}
-	oldExportedServices, _ := NewExportedServicesFromKubeService(*oldService)
 	newExportedServices, _ := NewExportedServicesFromKubeService(*newService)
-	log.Printf("Update %v -> %v", oldExportedServices, newExportedServices)
+	for _, es := range newExportedServices {
+		log.Printf("Update %+v", es)
+	}
 }
 
 func (sw *ServiceWatcher) deleteService(service *v1.Service) {
@@ -110,5 +114,7 @@ func (sw *ServiceWatcher) deleteService(service *v1.Service) {
 	sw.wg.Add(1)
 
 	exportedServices, _ := NewExportedServicesFromKubeService(*service)
-	log.Printf("Delete %v", exportedServices)
+	for _, es := range exportedServices {
+		log.Printf("Delete %+v", es)
+	}
 }
