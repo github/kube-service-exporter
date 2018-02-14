@@ -20,10 +20,10 @@ const (
 	// A path for an HTTP Health check to be delivered to the HealthCheckPort
 	ServiceAnnotationLoadBalancerHealthCheckPath = "kube-service-exporter.github.com/load-balancer-health-check-path"
 
-	ServiceAnnotationLoadBalancerFailureDomain = "kube-service-exporter.github.com/load-balancer--failure-domain"
+	ServiceAnnotationLoadBalancerFailureDomain = "kube-service-exporter.github.com/load-balancer-failure-domain"
 
-	// If set and not an empty string, this will signal to create a separately named
-	// service *per failure domain*, useful for applications that should not be
+	// If set and set to "false" this will create a separate service
+	// *per failure domain*, useful for applications that should not be
 	// load balanced across failure domains.
 	ServiceAnnotationLoadBalancerServicePerFailureDomain = "kube-service-exporter.github.com/load-balancer-service-per-failure-domain"
 )
@@ -73,10 +73,16 @@ func NewExportedServicesFromKubeService(service v1.Service) ([]*ExportedService,
 // v1.Service.Ports array and returns an ExportedService.
 func NewExportedService(service v1.Service, portIdx int) *ExportedService {
 	es := &ExportedService{
-		Namespace:       service.Namespace,
-		Name:            service.Name,
-		Port:            service.Spec.Ports[portIdx].NodePort,
-		HealthCheckPort: service.Spec.HealthCheckNodePort,
+		Namespace:               service.Namespace,
+		Name:                    service.Name,
+		Port:                    service.Spec.Ports[portIdx].NodePort,
+		HealthCheckPort:         service.Spec.HealthCheckNodePort,
+		ServicePerFailureDomain: true,
+		BackendProtocol:         "http",
+	}
+
+	if es.HealthCheckPort == 0 {
+		es.HealthCheckPort = es.Port
 	}
 
 	if service.Annotations != nil {
@@ -84,11 +90,8 @@ func NewExportedService(service v1.Service, portIdx int) *ExportedService {
 			es.ProxyProtocol = true
 		}
 
-		switch service.Annotations[ServiceAnnotationLoadBalancerBEProtocol] {
-		case "tcp":
+		if service.Annotations[ServiceAnnotationLoadBalancerBEProtocol] == "tcp" {
 			es.BackendProtocol = "tcp"
-		default:
-			es.BackendProtocol = "http"
 		}
 
 		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthCheckPath]; ok {
@@ -99,8 +102,8 @@ func NewExportedService(service v1.Service, portIdx int) *ExportedService {
 			es.FailureDomain = val
 		}
 
-		if service.Annotations[ServiceAnnotationLoadBalancerServicePerFailureDomain] != "" {
-			es.ServicePerFailureDomain = true
+		if service.Annotations[ServiceAnnotationLoadBalancerServicePerFailureDomain] == "false" {
+			es.ServicePerFailureDomain = false
 		}
 	}
 
