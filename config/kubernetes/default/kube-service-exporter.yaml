@@ -17,10 +17,6 @@ spec:
       labels:
         k8s-app: kube-service-exporter
     spec:
-      tolerations:
-      - key: "dedicated"
-        operator: "Exists"
-        effect: "NoSchedule"
       containers:
       - name: kube-service-exporter
         image: kube-service-exporter
