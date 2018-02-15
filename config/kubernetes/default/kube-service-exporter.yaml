@@ -5,8 +5,6 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-system
-  annotations:
-    heaven.githubapp.com/daemonset-update-behavior: "replace-on-every-deploy"
 spec:
   updateStrategy:
     type: RollingUpdate
