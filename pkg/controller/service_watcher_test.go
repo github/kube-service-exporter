@@ -95,11 +95,14 @@ func (s *ServiceWatcherSuite) SetupTest() {
 	ns := &v1.Namespace{ObjectMeta: meta_v1.ObjectMeta{Name: "default"}}
 
 	// set up a fake ListerWatcher and ClientSet
-	s.ic, err = NewInformerConfig()
-	require.NoError(s.T(), err)
-	s.ic.ClientSet = fake.NewSimpleClientset(ns)
 	s.source = fcache.NewFakeControllerSource()
-	s.ic.ListerWatcher = s.source
+	s.ic = &InformerConfig{
+		ClientSet:     fake.NewSimpleClientset(ns),
+		ListerWatcher: s.source,
+		ResyncPeriod:  time.Duration(0),
+	}
+
+	require.NoError(s.T(), err)
 
 	s.ic.ClientSet.CoreV1().Namespaces().Create(ns)
 	s.target = NewFakeTarget()
