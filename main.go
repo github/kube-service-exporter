@@ -8,31 +8,25 @@ import (
 	"time"
 
 	"github.com/github/kube-service-exporter/pkg/controller"
-
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"github.com/spf13/viper"
 )
 
-func NewClientSet() (kubernetes.Interface, error) {
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-	config, err := kubeConfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return kubernetes.NewForConfig(config)
-}
-
 func main() {
+	viper.SetEnvPrefix("KSE")
+	viper.AutomaticEnv()
+	namespaces := viper.GetStringSlice("NAMESPACE_LIST")
+	clusterId := viper.GetString("CLUSTER_ID")
+
+	log.Printf("Watching the following namespaces: %v", namespaces)
+
 	stoppedC := make(chan struct{})
 
-	cs, err := NewClientSet()
+	ic, err := controller.NewInformerConfig()
 	if err != nil {
-		log.Fatalf("Unable to acquire a clientset: %v", err)
+		log.Fatal(err)
 	}
 
-	sw := controller.NewServiceWatcher(cs, 15*time.Minute)
+	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, &controller.ConsulTarget{})
 	go sw.Run()
 
 	sigC := make(chan os.Signal, 1)

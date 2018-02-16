@@ -17,35 +17,29 @@ const (
 	// Options are `http` or `tcp` for HTTP backends or TCP backends
 	ServiceAnnotationLoadBalancerBEProtocol = "kube-service-exporter.github.com/load-balancer-backend-protocol"
 
-	// A path for an HTTP Health check to be delivered to the HealthCheckPort
+	// A path for an HTTP Health check
 	ServiceAnnotationLoadBalancerHealthCheckPath = "kube-service-exporter.github.com/load-balancer-health-check-path"
 
-	ServiceAnnotationLoadBalancerFailureDomain = "kube-service-exporter.github.com/load-balancer-failure-domain"
-
 	// If set and set to "false" this will create a separate service
-	// *per failure domain*, useful for applications that should not be
-	// load balanced across failure domains.
-	ServiceAnnotationLoadBalancerServicePerFailureDomain = "kube-service-exporter.github.com/load-balancer-service-per-failure-domain"
+	// *per cluster id*, useful for applications that should not be
+	// load balanced across multiple clusters.
+	ServiceAnnotationLoadBalancerServicePerCluster = "kube-service-exporter.github.com/load-balancer-service-per-cluster"
+
+	ServiceAnnotationLoadBalancerDNSName = "kube-service-exporter.github.com/load-balancer-dns-name"
 )
 
 type ExportedService struct {
-	// An Id for the Service, which allows cross-cluster grouped services
-	// If two services share the same Id on different clusters, the Service will
-	// be namespaced based on the Tag below, so it can be differentiated.
-	// Sharing the same Id on the same cluster is probably an error and may
-	// result in flapping.
-	Id                      string
-	Namespace               string
-	Name                    string
-	FailureDomain           string
-	ServicePerFailureDomain bool
-
+	ClusterId string
+	Namespace string
+	Name      string
 	// The Port on which the Service is reachable
 	Port int32
 
+	DNSName           string
+	ServicePerCluster bool
+
 	// an optional URI Path for the HealthCheck
 	HealthCheckPath string
-	HealthCheckPort int32
 
 	// TCP / HTTP
 	BackendProtocol string
@@ -56,36 +50,55 @@ type ExportedService struct {
 
 // NewExportedServicesFromKubeService returns a slice of ExportedServices, one
 // for each v1.Service Port.
-func NewExportedServicesFromKubeService(service v1.Service) ([]*ExportedService, error) {
-	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
+func NewExportedServicesFromKubeService(service *v1.Service, clusterId string) ([]*ExportedService, error) {
+	if !IsExportableService(service) {
 		return nil, fmt.Errorf("%s/%s is not a LoadBalancer Service", service.Namespace, service.Name)
 	}
 
 	exportedServices := make([]*ExportedService, 0, len(service.Spec.Ports))
 	for i := range service.Spec.Ports {
-		es := NewExportedService(service, i)
+		es, err := NewExportedService(service, clusterId, i)
+		if err != nil {
+			return nil, err
+		}
 		exportedServices = append(exportedServices, es)
 	}
 	return exportedServices, nil
 }
 
+// An Id for the Service, which allows cross-cluster grouped services
+// If two services share the same Id on different clusters, the Service will
+// be namespaced based on the Tag below, so it can be differentiated.
+func (es *ExportedService) Id() string {
+	if es.ServicePerCluster {
+		return fmt.Sprintf("%s-%s-%s-%d", es.ClusterId, es.Namespace, es.Name, es.Port)
+	}
+	return fmt.Sprintf("%s-%s-%d", es.Namespace, es.Name, es.Port)
+}
+
 // NewExportedService takes in a v1.Service and an index into the
 // v1.Service.Ports array and returns an ExportedService.
-func NewExportedService(service v1.Service, portIdx int) *ExportedService {
-	es := &ExportedService{
-		Namespace:               service.Namespace,
-		Name:                    service.Name,
-		Port:                    service.Spec.Ports[portIdx].NodePort,
-		HealthCheckPort:         service.Spec.HealthCheckNodePort,
-		ServicePerFailureDomain: true,
-		BackendProtocol:         "http",
+func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*ExportedService, error) {
+	// TODO add some validation to make sure that the clusterId contains only
+	//      safe characters for Consul Service names
+	if clusterId == "" {
+		return nil, fmt.Errorf("No clusterId specified")
 	}
 
-	if es.HealthCheckPort == 0 {
-		es.HealthCheckPort = es.Port
+	es := &ExportedService{
+		Namespace:         service.Namespace,
+		Name:              service.Name,
+		Port:              service.Spec.Ports[portIdx].NodePort,
+		ServicePerCluster: true,
+		BackendProtocol:   "http",
+		ClusterId:         clusterId,
 	}
 
 	if service.Annotations != nil {
+		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerDNSName]; ok {
+			es.DNSName = val
+		}
+
 		if service.Annotations[ServiceAnnotationProxyProtocol] == "*" {
 			es.ProxyProtocol = true
 		}
@@ -98,14 +111,14 @@ func NewExportedService(service v1.Service, portIdx int) *ExportedService {
 			es.HealthCheckPath = val
 		}
 
-		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerFailureDomain]; ok {
-			es.FailureDomain = val
-		}
-
-		if service.Annotations[ServiceAnnotationLoadBalancerServicePerFailureDomain] == "false" {
-			es.ServicePerFailureDomain = false
+		if service.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] == "false" {
+			es.ServicePerCluster = false
 		}
 	}
 
-	return es
+	return es, nil
+}
+
+func IsExportableService(service *v1.Service) bool {
+	return service.Spec.Type == v1.ServiceTypeLoadBalancer
 }

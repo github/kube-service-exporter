@@ -18,5 +18,5 @@ clean:
 	rm -vrf bin
 	rm coverage.out
 
-coverage: test
+coverage:
 	go tool cover -html=coverage.out
