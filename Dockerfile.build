@@ -2,6 +2,16 @@ FROM golang:1.9
 LABEL cibuild.context-stream=tar
 
 RUN go get -v github.com/Masterminds/glide
+RUN apt-get update && \
+      apt-get install -y unzip && \
+      apt-get clean && \
+      rm -rf /var/lib/apt/lists/*
+
+RUN curl -s https://releases.hashicorp.com/consul/1.0.6/consul_1.0.6_linux_amd64.zip -o /tmp/consul.zip && \
+      sha256sum /tmp/consul.zip > /tmp/sha256sum.txt && \
+      sha256sum -c /tmp/sha256sum.txt && \
+      unzip /tmp/consul.zip -d /usr/local/bin
+
 WORKDIR /go/src/github.com/github/kube-service-exporter
 COPY . .
 RUN make

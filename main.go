@@ -26,7 +26,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, &controller.ConsulTarget{})
+	target, err := controller.NewConsulTarget()
+	if err != nil {
+		log.Fatal(err)
+	}
+	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
 	go sw.Run()
 
 	sigC := make(chan os.Signal, 1)
