@@ -32,6 +32,9 @@ type ExportedService struct {
 	ClusterId string
 	Namespace string
 	Name      string
+
+	// The uniquely Name for the NodePort
+	PortName string
 	// The Port on which the Service is reachable
 	Port int32
 
@@ -71,9 +74,9 @@ func NewExportedServicesFromKubeService(service *v1.Service, clusterId string) (
 // be namespaced based on the Tag below, so it can be differentiated.
 func (es *ExportedService) Id() string {
 	if es.ServicePerCluster {
-		return fmt.Sprintf("%s-%s-%s-%d", es.ClusterId, es.Namespace, es.Name, es.Port)
+		return fmt.Sprintf("%s-%s-%s-%s", es.ClusterId, es.Namespace, es.Name, es.PortName)
 	}
-	return fmt.Sprintf("%s-%s-%d", es.Namespace, es.Name, es.Port)
+	return fmt.Sprintf("%s-%s-%s", es.Namespace, es.Name, es.PortName)
 }
 
 // NewExportedService takes in a v1.Service and an index into the
@@ -88,6 +91,7 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 	es := &ExportedService{
 		Namespace:         service.Namespace,
 		Name:              service.Name,
+		PortName:          service.Spec.Ports[portIdx].Name,
 		Port:              service.Spec.Ports[portIdx].NodePort,
 		ServicePerCluster: true,
 		BackendProtocol:   "http",

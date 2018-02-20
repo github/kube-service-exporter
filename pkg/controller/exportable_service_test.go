@@ -107,5 +107,5 @@ func TestNewExportedServicesFromKubeServices(t *testing.T) {
 func TestId(t *testing.T) {
 	svc := ServiceFixture()
 	es, _ := NewExportedService(svc, "cluster", 0)
-	assert.Equal(t, "cluster-default-service1-32123", es.Id())
+	assert.Equal(t, "cluster-default-service1-http", es.Id())
 }

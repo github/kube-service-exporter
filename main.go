@@ -14,9 +14,12 @@ import (
 func main() {
 	viper.SetEnvPrefix("KSE")
 	viper.AutomaticEnv()
+	viper.SetDefault("CONSUL_KV_PREFIX", "kube-service-exporter")
+
 	namespaces := viper.GetStringSlice("NAMESPACE_LIST")
 	clusterId := viper.GetString("CLUSTER_ID")
 	hostIP := viper.GetString("HOST_IP")
+	kvPrefix := viper.GetString("CONSUL_KV_PREFIX")
 
 	log.Printf("Watching the following namespaces: %v", namespaces)
 
@@ -27,7 +30,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	target, err := controller.NewConsulTarget(hostIP)
+	target, err := controller.NewConsulTarget(hostIP, kvPrefix)
 	if err != nil {
 		log.Fatal(err)
 	}

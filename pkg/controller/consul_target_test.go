@@ -27,6 +27,9 @@ func TestConsulTargetSuite(t *testing.T) {
 	suite.Run(t, new(ConsulTargetSuite))
 }
 
+// Start consul in dev mode on a random port for testing against
+// Logs will go to stdout/stderr
+// Each outer Test* func will get a freshly restarted consul
 func (s *ConsulTargetSuite) startConsul() {
 	// find a random unused port for Consul to listen on just to reduce the
 	// probability that we talk to a production Consul.  This is racey, but
@@ -74,6 +77,7 @@ func (s *ConsulTargetSuite) startConsul() {
 	}
 }
 
+// Stop consul.  Wait up to 2 seconds before killing it forcefully
 func (s *ConsulTargetSuite) stopConsul() {
 	s.consulCmd.Process.Signal(syscall.SIGINT)
 	stoppedC := make(chan struct{})
@@ -94,7 +98,7 @@ func (s *ConsulTargetSuite) stopConsul() {
 
 func (s *ConsulTargetSuite) SetupTest() {
 	s.startConsul()
-	s.target, _ = NewConsulTarget("127.0.0.1")
+	s.target, _ = NewConsulTarget("127.0.0.1", "kse-test")
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {
@@ -107,6 +111,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 			ClusterId: "cluster1",
 			Namespace: "ns1",
 			Name:      "name1",
+			PortName:  "http",
 			Port:      32001}
 
 		ok, err := s.target.Create(es)
@@ -114,12 +119,13 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.True(ok)
 
 		services, err := s.consul.Agent().Services()
-		_, found := services["ns1-name1-32001"]
+		_, found := services["ns1-name1-http"]
 		s.True(found)
 
 		node, _, err := s.consul.Catalog().Node(s.nodeName, &capi.QueryOptions{})
 		s.NoError(err)
-		_, found = node.Services["ns1-name1-32001"]
+		_, found = node.Services["ns1-name1-http"]
+		s.True(found)
 	})
 
 	s.T().Run("creates per-cluster service", func(t *testing.T) {
@@ -127,6 +133,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 			ClusterId:         "cluster2",
 			Namespace:         "ns2",
 			Name:              "name2",
+			PortName:          "http",
 			Port:              32002,
 			ServicePerCluster: true,
 		}
@@ -136,12 +143,40 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.True(ok)
 
 		services, err := s.consul.Agent().Services()
-		_, found := services["cluster2-ns2-name2-32002"]
+		service, found := services["cluster2-ns2-name2-http"]
 		s.True(found)
+		s.Contains(service.Tags, "cluster2", "service has cluster tag")
 
 		node, _, err := s.consul.Catalog().Node(s.nodeName, &capi.QueryOptions{})
 		s.NoError(err)
-		_, found = node.Services["cluster2-ns2-name2-32002"]
+		_, found = node.Services["cluster2-ns2-name2-http"]
+		s.True(found)
+	})
+
+	s.T().Run("Creates per-cluster metadata", func(t *testing.T) {
+		es := &ExportedService{
+			ClusterId:         "cluster3",
+			Namespace:         "ns3",
+			Name:              "name3",
+			PortName:          "http",
+			Port:              32003,
+			ServicePerCluster: false,
+		}
+
+		kv := s.consul.KV()
+		ok, err := s.target.Create(es)
+		s.NoError(err)
+		s.True(ok)
+
+		pair, _, err := kv.Get("kse-test/ns3-name3-http/clusters/cluster3/cluster_name", &capi.QueryOptions{})
+		s.NoError(err)
+		s.NotNil(pair)
+		s.Equal("cluster3", string(pair.Value))
+
+		pair, _, err = kv.Get("kse-test/ns3-name3-http/clusters/cluster3/proxy_protocol", &capi.QueryOptions{})
+		s.NoError(err)
+		s.NotNil(pair)
+		s.Equal("false", string(pair.Value))
 	})
 }
 
@@ -150,6 +185,7 @@ func (s *ConsulTargetSuite) TestDelete() {
 		ClusterId: "cluster1",
 		Namespace: "ns1",
 		Name:      "name1",
+		PortName:  "http",
 		Port:      32001}
 
 	ok, err := s.target.Create(es)
@@ -157,7 +193,7 @@ func (s *ConsulTargetSuite) TestDelete() {
 	s.True(ok)
 
 	services, err := s.consul.Agent().Services()
-	_, found := services["ns1-name1-32001"]
+	_, found := services["ns1-name1-http"]
 	s.True(found)
 
 	ok, err = s.target.Delete(es)
@@ -165,6 +201,6 @@ func (s *ConsulTargetSuite) TestDelete() {
 	s.True(ok)
 
 	services, err = s.consul.Agent().Services()
-	_, found = services["ns1-name1-32001"]
+	_, found = services["ns1-name1-http"]
 	s.False(found)
 }

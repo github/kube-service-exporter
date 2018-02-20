@@ -2,42 +2,48 @@ package controller
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 
 	capi "github.com/hashicorp/consul/api"
 )
 
 type ConsulTarget struct {
-	client *capi.Client
-	hostIP string
+	client   *capi.Client
+	hostIP   string
+	kvPrefix string
 }
 
 var _ ExportTarget = (*ConsulTarget)(nil)
 
-func NewConsulTarget(hostIP string) (*ConsulTarget, error) {
+func NewConsulTarget(hostIP string, kvPrefix string) (*ConsulTarget, error) {
 	client, err := capi.NewClient(capi.DefaultConfig())
 	if err != nil {
 		return nil, err
 	}
 
-	return &ConsulTarget{client: client, hostIP: hostIP}, nil
+	return &ConsulTarget{
+		client:   client,
+		hostIP:   hostIP,
+		kvPrefix: kvPrefix}, nil
 }
 
 func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 	asr := t.asrFromExportedService(es)
-	err := t.client.Agent().ServiceRegister(asr)
-	if err != nil {
+
+	if err := t.client.Agent().ServiceRegister(asr); err != nil {
 		return false, err
 	}
+
+	t.withLock(es, func() error {
+		return t.writeKV(es)
+	})
 
 	return true, nil
 }
 
 func (t *ConsulTarget) Update(es *ExportedService) (bool, error) {
-	ok, err := t.Create(es)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return t.Create(es)
 }
 
 func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
@@ -46,6 +52,55 @@ func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// Write out metadata to where it belongs using a transaction
+func (t *ConsulTarget) writeKV(es *ExportedService) error {
+	kvPairs := map[string]string{
+		"cluster_name":      es.ClusterId,
+		"proxy_protocol":    strconv.FormatBool(es.ProxyProtocol),
+		"backend_protocol":  es.BackendProtocol,
+		"health_check_path": es.HealthCheckPath,
+		"dns_name":          es.DNSName,
+	}
+
+	// write out the cluster name as a key
+	ops := make([]*capi.KVTxnOp, 0, len(kvPairs))
+
+	for k, v := range kvPairs {
+		op := &capi.KVTxnOp{
+			Verb:  capi.KVSet,
+			Key:   fmt.Sprintf("%s/%s/clusters/%s/%s", t.kvPrefix, es.Id(), es.ClusterId, k),
+			Value: []byte(v),
+		}
+		ops = append(ops, op)
+	}
+
+	_, _, _, err := t.client.KV().Txn(ops, nil)
+	return err
+}
+
+// tries to acquire a lock using Consul leader election, so KV operations are
+// only performed by the leader
+func (t *ConsulTarget) withLock(es *ExportedService, fn func() error) error {
+	lo := &capi.LockOptions{
+		Key: fmt.Sprintf("%s/%s/clusters/%s/lock", t.kvPrefix, es.Id(), es.ClusterId),
+
+		// LockWaitTime == 0 defaults to a lock wait of 15s, so specify a short wait
+		LockWaitTime: 1 * time.Millisecond,
+		LockTryOnce:  true,
+	}
+	lock, err := t.client.LockOpts(lo)
+	if err != nil {
+		return err
+	}
+
+	if _, err := lock.Lock(make(chan struct{})); err != nil {
+		return err
+	}
+	defer lock.Unlock()
+
+	return fn()
 }
 
 func (t *ConsulTarget) asrFromExportedService(es *ExportedService) *capi.AgentServiceRegistration {
