@@ -1,10 +1,18 @@
 hash: 08fd256404aaf489076343f294325ae2ddbfa834d897bac89ff8ac78dcf65973
-updated: 2018-02-16T15:31:29.666854-05:00
+updated: 2018-02-16T15:44:03.710999-05:00
 imports:
+- name: github.com/armon/go-metrics
+  version: 7aa49fde808223f8dadfdbfd3a20ff6c19e5f9ec
+- name: github.com/davecgh/go-spew
+  version: 782f4967f2dc4564575ca782fe2d04090b5faca8
+  subpackages:
+  - spew
 - name: github.com/emicklei/go-restful
   version: ff4f55a206334ef123e4f79bbf348980da81ca46
   subpackages:
   - log
+- name: github.com/fsnotify/fsnotify
+  version: c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-openapi/jsonpointer
@@ -48,6 +56,12 @@ imports:
   version: 9a494b5fb9c86180a5702e29c485df1507a47198
   subpackages:
   - api
+- name: github.com/hashicorp/go-cleanhttp
+  version: d5fe4b57a186c716b0e00b8c301cbd9b4182694d
+- name: github.com/hashicorp/go-immutable-radix
+  version: 7f3cd4390caab3250a57f30efdb2a65dd7649ecf
+- name: github.com/hashicorp/go-rootcerts
+  version: 6bb64b370b90e7ef1fa532be9e591a81c3493e00
 - name: github.com/hashicorp/golang-lru
   version: a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4
   subpackages:
@@ -63,6 +77,10 @@ imports:
   - json/parser
   - json/scanner
   - json/token
+- name: github.com/hashicorp/serf
+  version: d4f33d5b6a0b7b252b122dc80d559e9e5280d2d4
+  subpackages:
+  - coordinate
 - name: github.com/howeyc/gopass
   version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
 - name: github.com/imdario/mergo
@@ -71,20 +89,38 @@ imports:
   version: 36b14963da70d11297d313183d7e6388c8510e1e
 - name: github.com/juju/ratelimit
   version: 5b9ff866471762aa2ab2dced63c9fb6f53921342
+- name: github.com/magiconair/properties
+  version: c3beff4c2358b44d0493c7dda585e7db7ff28ae6
 - name: github.com/mailru/easyjson
   version: 2f5df55504ebc322e4d52d34df6a1f5b503bf26d
   subpackages:
   - buffer
   - jlexer
   - jwriter
+- name: github.com/mitchellh/go-homedir
+  version: b8bc1bf767474819792c23f32d8286a45736f1c6
+- name: github.com/mitchellh/mapstructure
+  version: a4e142e9c047c904fa2f1e144d9a84e6133024bc
+- name: github.com/pelletier/go-toml
+  version: acdc4509485b587f5e675510c4f2c63e90ff68a8
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/PuerkitoBio/purell
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
+- name: github.com/spf13/afero
+  version: bbf41cb36dffe15dff5bf7e18c447801e7ffe163
+  subpackages:
+  - mem
+- name: github.com/spf13/cast
+  version: 8965335b8c7107321228e3e3702cab9832751bac
+- name: github.com/spf13/jwalterweatherman
+  version: 7c0cea34c8ece3fbeb2b27ab9b59511d360fb394
 - name: github.com/spf13/pflag
   version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+- name: github.com/spf13/viper
+  version: 25b30aa063fc18e48662b86996252eabdcf2f0c7
 - name: golang.org/x/crypto
   version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:
@@ -269,8 +305,10 @@ imports:
   - tools/clientcmd/api/latest
   - tools/clientcmd/api/v1
   - tools/metrics
+  - tools/pager
   - tools/reference
   - transport
+  - util/buffer
   - util/cert
   - util/flowcontrol
   - util/homedir
