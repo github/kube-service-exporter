@@ -67,7 +67,7 @@ func (s *ConsulTargetSuite) stopConsul() {
 	timer := time.NewTimer(2 * time.Second)
 	select {
 	case <-timer.C:
-		s.T().Fatal("Took too long to start consul")
+		s.T().Fatal("Took too long to stop consul")
 	case <-stoppedC:
 		s.consulCmd.Process.Kill()
 	}
