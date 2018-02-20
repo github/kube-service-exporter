@@ -21,6 +21,7 @@ type ConsulTargetSuite struct {
 	consul    *capi.Client
 	target    *ConsulTarget
 	nodeName  string
+	consulCfg *capi.Config
 }
 
 func TestConsulTargetSuite(t *testing.T) {
@@ -49,10 +50,10 @@ func (s *ConsulTargetSuite) startConsul() {
 	err = s.consulCmd.Start()
 	require.NoError(s.T(), err)
 
-	os.Setenv("CONSUL_HTTP_ADDR", listener.Addr().String())
-	os.Setenv("CONSUL_HTTP_SSL", "false")
+	s.consulCfg = capi.DefaultConfig()
+	s.consulCfg.Address = listener.Addr().String()
 
-	client, err := capi.NewClient(capi.DefaultConfig())
+	client, err := capi.NewClient(s.consulCfg)
 	require.NoError(s.T(), err)
 	s.consul = client
 
@@ -98,7 +99,7 @@ func (s *ConsulTargetSuite) stopConsul() {
 
 func (s *ConsulTargetSuite) SetupTest() {
 	s.startConsul()
-	s.target, _ = NewConsulTarget("127.0.0.1", "kse-test")
+	s.target, _ = NewConsulTarget(s.consulCfg, "kse-test")
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {

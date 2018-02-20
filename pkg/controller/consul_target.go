@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 
@@ -16,8 +17,13 @@ type ConsulTarget struct {
 
 var _ ExportTarget = (*ConsulTarget)(nil)
 
-func NewConsulTarget(hostIP string, kvPrefix string) (*ConsulTarget, error) {
-	client, err := capi.NewClient(capi.DefaultConfig())
+func NewConsulTarget(cfg *capi.Config, kvPrefix string) (*ConsulTarget, error) {
+	hostIP, _, err := net.SplitHostPort(cfg.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := capi.NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/github/kube-service-exporter/pkg/controller"
+	capi "github.com/hashicorp/consul/api"
 	"github.com/spf13/viper"
 )
 
@@ -15,11 +17,14 @@ func main() {
 	viper.SetEnvPrefix("KSE")
 	viper.AutomaticEnv()
 	viper.SetDefault("CONSUL_KV_PREFIX", "kube-service-exporter")
+	viper.SetDefault("CONSUL_HOST", "127.0.0.1")
+	viper.SetDefault("CONSUL_PORT", 8500)
 
 	namespaces := viper.GetStringSlice("NAMESPACE_LIST")
 	clusterId := viper.GetString("CLUSTER_ID")
-	hostIP := viper.GetString("HOST_IP")
 	kvPrefix := viper.GetString("CONSUL_KV_PREFIX")
+	consulHost := viper.GetString("CONSUL_HOST")
+	consulPort := viper.GetInt("CONSUL_PORT")
 
 	log.Printf("Watching the following namespaces: %v", namespaces)
 
@@ -30,7 +35,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	target, err := controller.NewConsulTarget(hostIP, kvPrefix)
+	consulCfg := capi.DefaultConfig()
+	consulCfg.Address = fmt.Sprintf("%s:%d", consulHost, consulPort)
+	target, err := controller.NewConsulTarget(consulCfg, kvPrefix)
 	if err != nil {
 		log.Fatal(err)
 	}
