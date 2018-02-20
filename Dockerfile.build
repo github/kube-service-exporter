@@ -1,4 +1,4 @@
-FROM golang:1.9
+FROM golang:1.10
 LABEL cibuild.context-stream=tar
 
 RUN go get -v github.com/Masterminds/glide
