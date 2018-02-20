@@ -30,3 +30,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: KSE_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.hostIP

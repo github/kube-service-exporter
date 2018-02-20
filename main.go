@@ -16,6 +16,7 @@ func main() {
 	viper.AutomaticEnv()
 	namespaces := viper.GetStringSlice("NAMESPACE_LIST")
 	clusterId := viper.GetString("CLUSTER_ID")
+	hostIP := viper.GetString("HOST_IP")
 
 	log.Printf("Watching the following namespaces: %v", namespaces)
 
@@ -26,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	target, err := controller.NewConsulTarget()
+	target, err := controller.NewConsulTarget(hostIP)
 	if err != nil {
 		log.Fatal(err)
 	}
