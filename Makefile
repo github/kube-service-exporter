@@ -1,5 +1,5 @@
 GO=go
-FILES=`glide novendor`
+FILES=`go list ./.../`
 
 .PHONY: all vet test build clean coverage
 
