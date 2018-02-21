@@ -67,7 +67,7 @@ func main() {
 	timer := time.NewTimer(5 * time.Second)
 	select {
 	case <-timer.C:
-		log.Println("goroutines too long to stop. Exiting.")
+		log.Println("goroutines took too long to stop. Exiting.")
 	case <-stoppedC:
 		log.Println("Stopped.")
 	}
