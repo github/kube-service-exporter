@@ -113,38 +113,40 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 		ClusterId:         clusterId,
 	}
 
-	if service.Annotations != nil {
-		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerDNSName]; ok {
-			es.DNSName = val
-		}
+	if service.Annotations == nil {
+		return es, nil
+	}
 
-		if service.Annotations[ServiceAnnotationProxyProtocol] == "*" {
-			es.ProxyProtocol = true
-		}
+	if val, ok := service.Annotations[ServiceAnnotationLoadBalancerDNSName]; ok {
+		es.DNSName = val
+	}
 
-		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerClass]; ok {
-			es.LoadBalancerClass = val
-		}
+	if service.Annotations[ServiceAnnotationProxyProtocol] == "*" {
+		es.ProxyProtocol = true
+	}
 
-		if service.Annotations[ServiceAnnotationLoadBalancerBEProtocol] == "tcp" {
-			es.BackendProtocol = "tcp"
-		}
+	if val, ok := service.Annotations[ServiceAnnotationLoadBalancerClass]; ok {
+		es.LoadBalancerClass = val
+	}
 
-		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthCheckPath]; ok {
-			es.HealthCheckPath = val
-		}
+	if service.Annotations[ServiceAnnotationLoadBalancerBEProtocol] == "tcp" {
+		es.BackendProtocol = "tcp"
+	}
 
-		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthCheckPort]; ok {
-			port, err := strconv.ParseInt(val, 10, 32)
-			if err != nil {
-				return nil, fmt.Errorf("Error setting HealthCheckPort: %v", err)
-			}
-			es.HealthCheckPort = int32(port)
-		}
+	if val, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthCheckPath]; ok {
+		es.HealthCheckPath = val
+	}
 
-		if service.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] == "false" {
-			es.ServicePerCluster = false
+	if val, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthCheckPort]; ok {
+		port, err := strconv.ParseInt(val, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("Error setting HealthCheckPort: %v", err)
 		}
+		es.HealthCheckPort = int32(port)
+	}
+
+	if service.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] == "false" {
+		es.ServicePerCluster = false
 	}
 
 	return es, nil
