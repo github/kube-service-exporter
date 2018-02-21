@@ -63,11 +63,13 @@ func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
 // Write out metadata to where it belongs using a transaction
 func (t *ConsulTarget) writeKV(es *ExportedService) error {
 	kvPairs := map[string]string{
-		"cluster_name":      es.ClusterId,
-		"proxy_protocol":    strconv.FormatBool(es.ProxyProtocol),
-		"backend_protocol":  es.BackendProtocol,
-		"health_check_path": es.HealthCheckPath,
-		"dns_name":          es.DNSName,
+		"cluster_name":        es.ClusterId,
+		"proxy_protocol":      strconv.FormatBool(es.ProxyProtocol),
+		"backend_protocol":    es.BackendProtocol,
+		"health_check_path":   es.HealthCheckPath,
+		"health_check_port":   strconv.Itoa(int(es.HealthCheckPort)),
+		"dns_name":            es.DNSName,
+		"load_balancer_class": es.LoadBalancerClass,
 	}
 
 	// write out the cluster name as a key

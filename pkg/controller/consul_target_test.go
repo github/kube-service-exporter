@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const KvPrefix = "kse-test"
+
 type ConsulTargetSuite struct {
 	suite.Suite
 	consulCmd *exec.Cmd
@@ -99,7 +101,7 @@ func (s *ConsulTargetSuite) stopConsul() {
 
 func (s *ConsulTargetSuite) SetupTest() {
 	s.startConsul()
-	s.target, _ = NewConsulTarget(s.consulCfg, "kse-test")
+	s.target, _ = NewConsulTarget(s.consulCfg, KvPrefix)
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {
@@ -162,6 +164,8 @@ func (s *ConsulTargetSuite) TestCreate() {
 			PortName:          "http",
 			Port:              32003,
 			ServicePerCluster: false,
+			LoadBalancerClass: "internal",
+			HealthCheckPort:   32303,
 		}
 
 		kv := s.consul.KV()
@@ -169,15 +173,20 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.NoError(err)
 		s.True(ok)
 
-		pair, _, err := kv.Get("kse-test/ns3-name3-http/clusters/cluster3/cluster_name", &capi.QueryOptions{})
-		s.NoError(err)
-		s.NotNil(pair)
-		s.Equal("cluster3", string(pair.Value))
+		expectations := map[string]string{
+			"cluster_name":        "cluster3",
+			"proxy_protocol":      "false",
+			"health_check_port":   "32303",
+			"load_balancer_class": "internal",
+		}
 
-		pair, _, err = kv.Get("kse-test/ns3-name3-http/clusters/cluster3/proxy_protocol", &capi.QueryOptions{})
-		s.NoError(err)
-		s.NotNil(pair)
-		s.Equal("false", string(pair.Value))
+		for k, v := range expectations {
+			key := fmt.Sprintf("%s/%s-%s-%s/clusters/%s/%s", KvPrefix, es.Namespace, es.Name, es.PortName, es.ClusterId, k)
+			pair, _, err := kv.Get(key, &capi.QueryOptions{})
+			s.NoError(err)
+			s.NotNil(pair)
+			s.Equal(v, string(pair.Value))
+		}
 	})
 }
 

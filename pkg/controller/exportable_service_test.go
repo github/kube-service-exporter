@@ -54,7 +54,9 @@ func TestNewExportedService(t *testing.T) {
 		assert.Equal(t, svc.Namespace, es.Namespace)
 		assert.Equal(t, svc.Name, es.Name)
 		assert.Equal(t, svc.Spec.Ports[portIdx].NodePort, es.Port)
+		assert.Equal(t, svc.Spec.Ports[portIdx].NodePort, es.HealthCheckPort)
 		assert.False(t, es.ProxyProtocol)
+		assert.Empty(t, es.LoadBalancerClass)
 		assert.Equal(t, "http", es.BackendProtocol)
 		assert.Empty(t, es.HealthCheckPath)
 		assert.True(t, es.ServicePerCluster)
@@ -64,8 +66,10 @@ func TestNewExportedService(t *testing.T) {
 		portIdx := 0
 		svc := ServiceFixture()
 		svc.Annotations[ServiceAnnotationProxyProtocol] = "*"
+		svc.Annotations[ServiceAnnotationLoadBalancerClass] = "internal"
 		svc.Annotations[ServiceAnnotationLoadBalancerBEProtocol] = "tcp"
 		svc.Annotations[ServiceAnnotationLoadBalancerHealthCheckPath] = "/foo/bar"
+		svc.Annotations[ServiceAnnotationLoadBalancerHealthCheckPort] = "32001"
 		svc.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] = "false"
 
 		es, err := NewExportedService(svc, "cluster", portIdx)
@@ -73,7 +77,9 @@ func TestNewExportedService(t *testing.T) {
 		assert.True(t, es.ProxyProtocol)
 		assert.Equal(t, "tcp", es.BackendProtocol)
 		assert.Equal(t, "/foo/bar", es.HealthCheckPath)
+		assert.Equal(t, int32(32001), es.HealthCheckPort)
 		assert.False(t, es.ServicePerCluster)
+		assert.Equal(t, "internal", es.LoadBalancerClass)
 	})
 }
 

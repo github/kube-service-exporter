@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strconv"
 
 	"k8s.io/api/core/v1"
 )
@@ -12,13 +13,19 @@ const (
 	// "*" to indicate that all backends should support Proxy Protocol.
 	ServiceAnnotationProxyProtocol = "kube-service-exporter.github.com/load-balancer-proxy-protocol"
 
+	// The load balancer class is the target load balancer to apply that the
+	// service should be a member of.  Examples might be "internal" or "public"
+	ServiceAnnotationLoadBalancerClass = "kube-service-exporter.github.com/load-balancer-class"
+
 	// ServiceAnnotationLoadBalancerBEProtocol is the annotation used on the service
 	// to specify the protocol spoken by the backend (pod) behind a listener.
 	// Options are `http` or `tcp` for HTTP backends or TCP backends
 	ServiceAnnotationLoadBalancerBEProtocol = "kube-service-exporter.github.com/load-balancer-backend-protocol"
 
-	// A path for an HTTP Health check
+	// A path for an HTTP Health check.
 	ServiceAnnotationLoadBalancerHealthCheckPath = "kube-service-exporter.github.com/load-balancer-health-check-path"
+	// The port for a the Health check. If unset, defaults to the NodePort.
+	ServiceAnnotationLoadBalancerHealthCheckPort = "kube-service-exporter.github.com/load-balancer-health-check-port"
 
 	// If set and set to "false" this will create a separate service
 	// *per cluster id*, useful for applications that should not be
@@ -44,11 +51,18 @@ type ExportedService struct {
 	// an optional URI Path for the HealthCheck
 	HealthCheckPath string
 
+	// HealthCheckPort is a port for the Health Check. Defaults to the NodePort
+	HealthCheckPort int32
+
 	// TCP / HTTP
 	BackendProtocol string
 
 	// Enable Proxy protocol on the backend
 	ProxyProtocol bool
+
+	// LoadBalancerClass can be used to target the service at a specific load
+	// balancer (e.g. "internal", "public"
+	LoadBalancerClass string
 }
 
 // NewExportedServicesFromKubeService returns a slice of ExportedServices, one
@@ -93,6 +107,7 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 		Name:              service.Name,
 		PortName:          service.Spec.Ports[portIdx].Name,
 		Port:              service.Spec.Ports[portIdx].NodePort,
+		HealthCheckPort:   service.Spec.Ports[portIdx].NodePort,
 		ServicePerCluster: true,
 		BackendProtocol:   "http",
 		ClusterId:         clusterId,
@@ -107,12 +122,24 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 			es.ProxyProtocol = true
 		}
 
+		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerClass]; ok {
+			es.LoadBalancerClass = val
+		}
+
 		if service.Annotations[ServiceAnnotationLoadBalancerBEProtocol] == "tcp" {
 			es.BackendProtocol = "tcp"
 		}
 
 		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthCheckPath]; ok {
 			es.HealthCheckPath = val
+		}
+
+		if val, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthCheckPort]; ok {
+			port, err := strconv.ParseInt(val, 10, 32)
+			if err != nil {
+				return nil, fmt.Errorf("Error setting HealthCheckPort: %v", err)
+			}
+			es.HealthCheckPort = int32(port)
 		}
 
 		if service.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] == "false" {
