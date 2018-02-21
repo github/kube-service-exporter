@@ -1,15 +1,16 @@
 FROM golang:1.10
 LABEL cibuild.context-stream=tar
 
+ARG CONSUL_URL="https://releases.hashicorp.com/consul/1.0.6/consul_1.0.6_linux_amd64.zip"
+ARG CONSUL_SHA="bcc504f658cef2944d1cd703eda90045e084a15752d23c038400cf98c716ea01"
 RUN go get -v github.com/Masterminds/glide
 RUN apt-get update && \
       apt-get install -y unzip && \
       apt-get clean && \
       rm -rf /var/lib/apt/lists/*
 
-RUN curl -s https://releases.hashicorp.com/consul/1.0.6/consul_1.0.6_linux_amd64.zip -o /tmp/consul.zip && \
-      sha256sum /tmp/consul.zip > /tmp/sha256sum.txt && \
-      sha256sum -c /tmp/sha256sum.txt && \
+RUN curl -s "$CONSUL_URL" -o /tmp/consul.zip && \
+      echo "$CONSUL_SHA /tmp/consul.zip" | sha256sum -c && \
       unzip /tmp/consul.zip -d /usr/local/bin
 
 WORKDIR /go/src/github.com/github/kube-service-exporter
