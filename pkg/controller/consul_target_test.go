@@ -15,7 +15,10 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const KvPrefix = "kse-test"
+const (
+	KvPrefix  = "kse-test"
+	ClusterId = "cluster1"
+)
 
 type ConsulTargetSuite struct {
 	suite.Suite
@@ -101,17 +104,31 @@ func (s *ConsulTargetSuite) stopConsul() {
 
 func (s *ConsulTargetSuite) SetupTest() {
 	s.startConsul()
-	s.target, _ = NewConsulTarget(s.consulCfg, KvPrefix)
+	s.target, _ = NewConsulTarget(s.consulCfg, KvPrefix, ClusterId)
+	go s.target.StartElector()
+
+	// wait until elected
+	for i := 0; i < 5; i++ {
+		if s.target.IsLeader() {
+			break
+		}
+		time.Sleep(time.Duration(i*100) * time.Millisecond)
+	}
+
+	if !s.target.IsLeader() {
+		s.T().Fatal("Leader never elected")
+	}
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {
 	s.stopConsul()
+	s.target.StopElector()
 }
 
 func (s *ConsulTargetSuite) TestCreate() {
 	s.T().Run("creates cluster-independent service", func(t *testing.T) {
 		es := &ExportedService{
-			ClusterId: "cluster1",
+			ClusterId: ClusterId,
 			Namespace: "ns1",
 			Name:      "name1",
 			PortName:  "http",
@@ -133,7 +150,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 
 	s.T().Run("creates per-cluster service", func(t *testing.T) {
 		es := &ExportedService{
-			ClusterId:         "cluster2",
+			ClusterId:         ClusterId,
 			Namespace:         "ns2",
 			Name:              "name2",
 			PortName:          "http",
@@ -146,19 +163,21 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.True(ok)
 
 		services, err := s.consul.Agent().Services()
-		service, found := services["cluster2-ns2-name2-http"]
+		service, found := services["cluster1-ns2-name2-http"]
 		s.True(found)
-		s.Contains(service.Tags, "cluster2", "service has cluster tag")
+		if found {
+			s.Contains(service.Tags, "cluster1", "service has cluster tag")
+		}
 
 		node, _, err := s.consul.Catalog().Node(s.nodeName, &capi.QueryOptions{})
 		s.NoError(err)
-		_, found = node.Services["cluster2-ns2-name2-http"]
+		_, found = node.Services["cluster1-ns2-name2-http"]
 		s.True(found)
 	})
 
 	s.T().Run("Creates per-cluster metadata", func(t *testing.T) {
 		es := &ExportedService{
-			ClusterId:         "cluster3",
+			ClusterId:         ClusterId,
 			Namespace:         "ns3",
 			Name:              "name3",
 			PortName:          "http",
@@ -174,7 +193,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.True(ok)
 
 		expectations := map[string]string{
-			"cluster_name":        "cluster3",
+			"cluster_name":        ClusterId,
 			"proxy_protocol":      "false",
 			"health_check_port":   "32303",
 			"load_balancer_class": "internal",
@@ -183,16 +202,18 @@ func (s *ConsulTargetSuite) TestCreate() {
 		for k, v := range expectations {
 			key := fmt.Sprintf("%s/%s-%s-%s/clusters/%s/%s", KvPrefix, es.Namespace, es.Name, es.PortName, es.ClusterId, k)
 			pair, _, err := kv.Get(key, &capi.QueryOptions{})
-			s.NoError(err)
-			s.NotNil(pair)
-			s.Equal(v, string(pair.Value))
+			s.NoErrorf(err, "Expected err for %s to be nil, got %+v", key, err)
+			s.NotNilf(pair, "expected KVPair for %s to be not nil", key)
+			if pair != nil {
+				s.Equalf(v, string(pair.Value), k, "expected %s to be %s", v, string(pair.Value))
+			}
 		}
 	})
 }
 
 func (s *ConsulTargetSuite) TestDelete() {
 	es := &ExportedService{
-		ClusterId: "cluster1",
+		ClusterId: ClusterId,
 		Namespace: "ns1",
 		Name:      "name1",
 		PortName:  "http",

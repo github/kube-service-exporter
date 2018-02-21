@@ -2,22 +2,28 @@ package controller
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"strconv"
-	"time"
+	"sync"
 
 	capi "github.com/hashicorp/consul/api"
 )
 
 type ConsulTarget struct {
-	client   *capi.Client
-	hostIP   string
-	kvPrefix string
+	client       *capi.Client
+	hostIP       string
+	kvPrefix     string
+	isLeader     bool
+	electorStopC chan struct{}
+	wg           sync.WaitGroup
+	clusterId    string
+	mutex        *sync.RWMutex
 }
 
 var _ ExportTarget = (*ConsulTarget)(nil)
 
-func NewConsulTarget(cfg *capi.Config, kvPrefix string) (*ConsulTarget, error) {
+func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string) (*ConsulTarget, error) {
 	hostIP, _, err := net.SplitHostPort(cfg.Address)
 	if err != nil {
 		return nil, err
@@ -29,21 +35,36 @@ func NewConsulTarget(cfg *capi.Config, kvPrefix string) (*ConsulTarget, error) {
 	}
 
 	return &ConsulTarget{
-		client:   client,
-		hostIP:   hostIP,
-		kvPrefix: kvPrefix}, nil
+		client:       client,
+		hostIP:       hostIP,
+		clusterId:    clusterId,
+		kvPrefix:     kvPrefix,
+		electorStopC: make(chan struct{}),
+		wg:           sync.WaitGroup{},
+		mutex:        &sync.RWMutex{}}, nil
 }
 
 func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 	asr := t.asrFromExportedService(es)
 
+	hasLeader, err := t.hasLeader()
+	if err != nil {
+		return false, err
+	}
+
+	if !hasLeader {
+		return false, fmt.Errorf("No leader found, refusing to create %s", es.Id())
+	}
+
 	if err := t.client.Agent().ServiceRegister(asr); err != nil {
 		return false, err
 	}
 
-	t.withLock(es, func() error {
-		return t.writeKV(es)
-	})
+	if t.IsLeader() {
+		if err := t.writeKV(es); err != nil {
+			return false, err
+		}
+	}
 
 	return true, nil
 }
@@ -88,27 +109,76 @@ func (t *ConsulTarget) writeKV(es *ExportedService) error {
 	return err
 }
 
-// tries to acquire a lock using Consul leader election, so KV operations are
-// only performed by the leader
-func (t *ConsulTarget) withLock(es *ExportedService, fn func() error) error {
-	lo := &capi.LockOptions{
-		Key: fmt.Sprintf("%s/%s/clusters/%s/lock", t.kvPrefix, es.Id(), es.ClusterId),
+// Manage leader election using Consul Locks
+func (t *ConsulTarget) StartElector() error {
+	t.wg.Add(1)
+	defer t.wg.Done()
 
-		// LockWaitTime == 0 defaults to a lock wait of 15s, so specify a short wait
-		LockWaitTime: 1 * time.Millisecond,
-		LockTryOnce:  true,
+	lo := &capi.LockOptions{
+		Key:   t.leaderKey(),
+		Value: []byte(t.hostIP),
 	}
+
 	lock, err := t.client.LockOpts(lo)
 	if err != nil {
 		return err
 	}
 
-	if _, err := lock.Lock(make(chan struct{})); err != nil {
-		return err
-	}
-	defer lock.Unlock()
+	for {
+		lockC, err := lock.Lock(t.electorStopC)
+		if err != nil {
+			log.Printf("Error trying to acquire lock: %+v", err)
+			continue
+		}
 
-	return fn()
+		// we are the leader until lockC is closed or the service stops
+		t.setIsLeader(true)
+
+		select {
+		case <-lockC:
+			t.setIsLeader(false)
+			lock.Unlock()
+		case <-t.electorStopC:
+			t.setIsLeader(false)
+			lock.Unlock()
+			return nil
+		}
+	}
+}
+
+func (t *ConsulTarget) setIsLeader(val bool) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	t.isLeader = val
+}
+
+func (t *ConsulTarget) IsLeader() bool {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	return t.isLeader
+}
+func (t *ConsulTarget) StopElector() {
+	close(t.electorStopC)
+	t.wg.Wait()
+}
+
+func (t *ConsulTarget) leaderKey() string {
+	return fmt.Sprintf("%s/leadership/%s-lock", t.kvPrefix, t.clusterId)
+}
+
+func (t *ConsulTarget) hasLeader() (bool, error) {
+	kvPair, _, err := t.client.KV().Get(t.leaderKey(), &capi.QueryOptions{})
+	if err != nil {
+		return false, err
+	}
+
+	if kvPair == nil {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (t *ConsulTarget) asrFromExportedService(es *ExportedService) *capi.AgentServiceRegistration {
