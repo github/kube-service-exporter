@@ -2,28 +2,26 @@ package controller
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"sync"
 
+	"github.com/github/kube-service-exporter/pkg/leader"
 	capi "github.com/hashicorp/consul/api"
 )
 
 type ConsulTarget struct {
-	client       *capi.Client
-	hostIP       string
-	kvPrefix     string
-	isLeader     bool
-	electorStopC chan struct{}
-	wg           sync.WaitGroup
-	clusterId    string
-	mutex        *sync.RWMutex
+	client    *capi.Client
+	elector   leader.LeaderElector
+	hostIP    string
+	kvPrefix  string
+	wg        sync.WaitGroup
+	clusterId string
 }
 
 var _ ExportTarget = (*ConsulTarget)(nil)
 
-func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string) (*ConsulTarget, error) {
+func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string, elector leader.LeaderElector) (*ConsulTarget, error) {
 	hostIP, _, err := net.SplitHostPort(cfg.Address)
 	if err != nil {
 		return nil, err
@@ -35,19 +33,17 @@ func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string) (*Cons
 	}
 
 	return &ConsulTarget{
-		client:       client,
-		hostIP:       hostIP,
-		clusterId:    clusterId,
-		kvPrefix:     kvPrefix,
-		electorStopC: make(chan struct{}),
-		wg:           sync.WaitGroup{},
-		mutex:        &sync.RWMutex{}}, nil
+		client:    client,
+		elector:   elector,
+		hostIP:    hostIP,
+		clusterId: clusterId,
+		kvPrefix:  kvPrefix}, nil
 }
 
 func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 	asr := t.asrFromExportedService(es)
 
-	hasLeader, err := t.hasLeader()
+	hasLeader, err := t.elector.HasLeader()
 	if err != nil {
 		return false, err
 	}
@@ -60,7 +56,7 @@ func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 		return false, err
 	}
 
-	if t.IsLeader() {
+	if t.elector.IsLeader() {
 		if err := t.writeKV(es); err != nil {
 			return false, err
 		}
@@ -107,78 +103,6 @@ func (t *ConsulTarget) writeKV(es *ExportedService) error {
 
 	_, _, _, err := t.client.KV().Txn(ops, nil)
 	return err
-}
-
-// Manage leader election using Consul Locks
-func (t *ConsulTarget) StartElector() error {
-	t.wg.Add(1)
-	defer t.wg.Done()
-
-	lo := &capi.LockOptions{
-		Key:   t.leaderKey(),
-		Value: []byte(t.hostIP),
-	}
-
-	lock, err := t.client.LockOpts(lo)
-	if err != nil {
-		return err
-	}
-
-	for {
-		lockC, err := lock.Lock(t.electorStopC)
-		if err != nil {
-			log.Printf("Error trying to acquire lock: %+v", err)
-			continue
-		}
-
-		// we are the leader until lockC is closed or the service stops
-		t.setIsLeader(true)
-
-		select {
-		case <-lockC:
-			t.setIsLeader(false)
-			lock.Unlock()
-		case <-t.electorStopC:
-			t.setIsLeader(false)
-			lock.Unlock()
-			return nil
-		}
-	}
-}
-
-func (t *ConsulTarget) setIsLeader(val bool) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.isLeader = val
-}
-
-func (t *ConsulTarget) IsLeader() bool {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	return t.isLeader
-}
-func (t *ConsulTarget) StopElector() {
-	close(t.electorStopC)
-	t.wg.Wait()
-}
-
-func (t *ConsulTarget) leaderKey() string {
-	return fmt.Sprintf("%s/leadership/%s-lock", t.kvPrefix, t.clusterId)
-}
-
-func (t *ConsulTarget) hasLeader() (bool, error) {
-	kvPair, _, err := t.client.KV().Get(t.leaderKey(), &capi.QueryOptions{})
-	if err != nil {
-		return false, err
-	}
-
-	if kvPair == nil {
-		return false, nil
-	}
-
-	return true, nil
 }
 
 func (t *ConsulTarget) asrFromExportedService(es *ExportedService) *capi.AgentServiceRegistration {

@@ -2,16 +2,11 @@ package controller
 
 import (
 	"fmt"
-	"net"
-	"os"
-	"os/exec"
-	"strconv"
-	"syscall"
 	"testing"
-	"time"
 
+	"github.com/github/kube-service-exporter/pkg/leader"
+	"github.com/github/kube-service-exporter/pkg/tests"
 	capi "github.com/hashicorp/consul/api"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -20,109 +15,55 @@ const (
 	ClusterId = "cluster1"
 )
 
+// A fake leader elector
+type fakeElector struct {
+	isLeader  bool
+	hasLeader bool
+}
+
+func (fe *fakeElector) IsLeader() bool {
+	return fe.isLeader
+}
+
+func (fe *fakeElector) HasLeader() (bool, error) {
+	return fe.hasLeader, nil
+}
+
+var _ leader.LeaderElector = (*fakeElector)(nil)
+
 type ConsulTargetSuite struct {
 	suite.Suite
-	consulCmd *exec.Cmd
-	consul    *capi.Client
-	target    *ConsulTarget
-	nodeName  string
-	consulCfg *capi.Config
+	consulServer *tests.TestingConsulServer
+	target       *ConsulTarget
 }
 
 func TestConsulTargetSuite(t *testing.T) {
 	suite.Run(t, new(ConsulTargetSuite))
 }
 
-// Start consul in dev mode on a random port for testing against
-// Logs will go to stdout/stderr
-// Each outer Test* func will get a freshly restarted consul
-func (s *ConsulTargetSuite) startConsul() {
-	// find a random unused port for Consul to listen on just to reduce the
-	// probability that we talk to a production Consul.  This is racey, but
-	// should be fine since it's unlikely someone is going to run a consul on
-	// our random port between closing this dummy listener and starting aConsul.
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
-	require.NoError(s.T(), err)
-	port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
-	listener.Close()
-
-	s.nodeName = fmt.Sprintf("kube-service-exporter-test-%s", port)
-	s.consulCmd = exec.Command("consul", "agent", "-dev",
-		"-http-port", port, "-bind=127.0.0.1",
-		"-node", s.nodeName)
-	s.consulCmd.Stdout = os.Stdout
-	s.consulCmd.Stderr = os.Stderr
-	err = s.consulCmd.Start()
-	require.NoError(s.T(), err)
-
-	s.consulCfg = capi.DefaultConfig()
-	s.consulCfg.Address = listener.Addr().String()
-
-	client, err := capi.NewClient(s.consulCfg)
-	require.NoError(s.T(), err)
-	s.consul = client
-
-	startedC := make(chan struct{})
-	go func() {
-		for {
-			_, err := s.consul.KV().Put(&capi.KVPair{Key: "test", Value: []byte("bar")}, nil)
-			if err == nil {
-				close(startedC)
-				break
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}()
-
-	// make sure the start doesn't take to long
-	timer := time.NewTimer(2 * time.Second)
-	select {
-	case <-timer.C:
-		s.T().Fatal("Took too long to start consul")
-	case <-startedC:
-	}
-}
-
-// Stop consul.  Wait up to 2 seconds before killing it forcefully
-func (s *ConsulTargetSuite) stopConsul() {
-	s.consulCmd.Process.Signal(syscall.SIGINT)
-	stoppedC := make(chan struct{})
-	go func() {
-		defer close(stoppedC)
-		s.consulCmd.Wait()
-	}()
-
-	// make sure the stop doesn't take to long
-	timer := time.NewTimer(2 * time.Second)
-	select {
-	case <-timer.C:
-		s.T().Fatal("Took too long to stop consul")
-	case <-stoppedC:
-		s.consulCmd.Process.Kill()
-	}
-}
-
 func (s *ConsulTargetSuite) SetupTest() {
-	s.startConsul()
-	s.target, _ = NewConsulTarget(s.consulCfg, KvPrefix, ClusterId)
-	go s.target.StartElector()
+	s.consulServer = tests.NewTestingConsulServer(s.T())
+	s.consulServer.Start()
+	elector := &fakeElector{isLeader: true, hasLeader: true}
+	s.target, _ = NewConsulTarget(s.consulServer.Config, KvPrefix, ClusterId, elector)
 
 	// wait until elected
-	for i := 0; i < 5; i++ {
-		if s.target.IsLeader() {
-			break
+	/*
+		for i := 0; i < 5; i++ {
+			if s.target.IsLeader() {
+				break
+			}
+			time.Sleep(time.Duration(i*100) * time.Millisecond)
 		}
-		time.Sleep(time.Duration(i*100) * time.Millisecond)
-	}
 
-	if !s.target.IsLeader() {
-		s.T().Fatal("Leader never elected")
-	}
+		if !s.target.IsLeader() {
+			s.T().Fatal("Leader never elected")
+		}
+	*/
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {
-	s.stopConsul()
-	s.target.StopElector()
+	s.consulServer.Stop()
 }
 
 func (s *ConsulTargetSuite) TestCreate() {
@@ -138,11 +79,11 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.NoError(err)
 		s.True(ok)
 
-		services, err := s.consul.Agent().Services()
+		services, err := s.consulServer.Client.Agent().Services()
 		_, found := services["ns1-name1-http"]
 		s.True(found)
 
-		node, _, err := s.consul.Catalog().Node(s.nodeName, &capi.QueryOptions{})
+		node, _, err := s.consulServer.Client.Catalog().Node(s.consulServer.NodeName, &capi.QueryOptions{})
 		s.NoError(err)
 		_, found = node.Services["ns1-name1-http"]
 		s.True(found)
@@ -162,14 +103,14 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.NoError(err)
 		s.True(ok)
 
-		services, err := s.consul.Agent().Services()
+		services, err := s.consulServer.Client.Agent().Services()
 		service, found := services["cluster1-ns2-name2-http"]
 		s.True(found)
 		if found {
 			s.Contains(service.Tags, "cluster1", "service has cluster tag")
 		}
 
-		node, _, err := s.consul.Catalog().Node(s.nodeName, &capi.QueryOptions{})
+		node, _, err := s.consulServer.Client.Catalog().Node(s.consulServer.NodeName, &capi.QueryOptions{})
 		s.NoError(err)
 		_, found = node.Services["cluster1-ns2-name2-http"]
 		s.True(found)
@@ -187,7 +128,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 			HealthCheckPort:   32303,
 		}
 
-		kv := s.consul.KV()
+		kv := s.consulServer.Client.KV()
 		ok, err := s.target.Create(es)
 		s.NoError(err)
 		s.True(ok)
@@ -223,7 +164,7 @@ func (s *ConsulTargetSuite) TestDelete() {
 	s.NoError(err)
 	s.True(ok)
 
-	services, err := s.consul.Agent().Services()
+	services, err := s.consulServer.Client.Agent().Services()
 	_, found := services["ns1-name1-http"]
 	s.True(found)
 
@@ -231,7 +172,7 @@ func (s *ConsulTargetSuite) TestDelete() {
 	s.NoError(err)
 	s.True(ok)
 
-	services, err = s.consul.Agent().Services()
+	services, err = s.consulServer.Client.Agent().Services()
 	_, found = services["ns1-name1-http"]
 	s.False(found)
 }
