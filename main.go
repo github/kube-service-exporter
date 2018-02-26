@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/github/kube-service-exporter/pkg/controller"
+	"github.com/github/kube-service-exporter/pkg/leader"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/spf13/viper"
 )
@@ -37,17 +38,23 @@ func main() {
 
 	consulCfg := capi.DefaultConfig()
 	consulCfg.Address = fmt.Sprintf("%s:%d", consulHost, consulPort)
-	target, err := controller.NewConsulTarget(consulCfg, kvPrefix, clusterId)
+
+	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		if err := elector.Run(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	target, err := controller.NewConsulTarget(consulCfg, kvPrefix, clusterId, elector)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
-	go func() {
-		if err := target.StartElector(); err != nil {
-			log.Fatal(err)
-		}
-	}()
 	go sw.Run()
 
 	sigC := make(chan os.Signal, 1)
@@ -59,7 +66,7 @@ func main() {
 		defer close(stoppedC)
 		sw.Stop()
 		log.Println("Stopped Service Watcher.")
-		target.StopElector()
+		elector.Stop()
 		log.Println("Stopped Consul leadership elector.")
 	}()
 

@@ -23,6 +23,7 @@ type TestingConsulServer struct {
 }
 
 func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
+	t.Helper()
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	require.NoError(t, err)
 	port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
@@ -52,6 +53,7 @@ func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
 // Logs will go to stdout/stderr
 // Each outer Test* func will get a freshly restarted consul
 func (server *TestingConsulServer) Start() {
+	server.t.Helper()
 	err := server.cmd.Start()
 	require.NoError(server.t, err)
 
@@ -82,6 +84,7 @@ func (server *TestingConsulServer) Start() {
 
 // Stop consul.  Wait up to 2 seconds before killing it forcefully
 func (server *TestingConsulServer) Stop() {
+	server.t.Helper()
 	server.cmd.Process.Signal(syscall.SIGINT)
 	stoppedC := make(chan struct{})
 	go func() {
