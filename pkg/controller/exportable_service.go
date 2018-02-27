@@ -40,7 +40,7 @@ type ExportedService struct {
 	Namespace string
 	Name      string
 
-	// The uniquely Name for the NodePort
+	// The unique Name for the NodePort. If no name, defaults to the Port
 	PortName string
 	// The Port on which the Service is reachable
 	Port int32
@@ -111,6 +111,10 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 		ServicePerCluster: true,
 		BackendProtocol:   "http",
 		ClusterId:         clusterId,
+	}
+
+	if es.PortName == "" {
+		es.PortName = strconv.Itoa(int(es.Port))
 	}
 
 	if service.Annotations == nil {

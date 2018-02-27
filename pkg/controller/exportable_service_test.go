@@ -111,7 +111,23 @@ func TestNewExportedServicesFromKubeServices(t *testing.T) {
 }
 
 func TestId(t *testing.T) {
-	svc := ServiceFixture()
-	es, _ := NewExportedService(svc, "cluster", 0)
-	assert.Equal(t, "cluster-default-service1-http", es.Id())
+	t.Run("Id includes cluster and port name", func(t *testing.T) {
+		svc := ServiceFixture()
+		es, _ := NewExportedService(svc, "cluster", 0)
+		assert.Equal(t, "cluster-default-service1-http", es.Id())
+	})
+
+	t.Run("Id does not include cluster", func(t *testing.T) {
+		svc := ServiceFixture()
+		svc.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] = "false"
+		es, _ := NewExportedService(svc, "cluster", 0)
+		assert.Equal(t, "default-service1-http", es.Id())
+	})
+
+	t.Run("Id includes cluster and port number", func(t *testing.T) {
+		svc := ServiceFixture()
+		svc.Spec.Ports[0].Name = ""
+		es, _ := NewExportedService(svc, "cluster", 0)
+		assert.Equal(t, "cluster-default-service1-32123", es.Id())
+	})
 }

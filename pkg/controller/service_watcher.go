@@ -153,10 +153,11 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	// Delete services that were changed
+	// Delete services that are no longer exportable (because they aren't LoadBalancer)
 	if IsExportableService(oldService) && !IsExportableService(newService) {
 		sw.deleteService(oldService, target)
 	}
+
 	newExportedServices, _ := NewExportedServicesFromKubeService(newService, sw.clusterId)
 	for _, es := range newExportedServices {
 		log.Printf("Update service %+v", es)
@@ -165,6 +166,9 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 			log.Printf("Error updating %+v", es)
 		}
 	}
+
+	// TODO delete ExportedServices that are in old, but not new (by Id)
+	// This should cover renaming the port name
 }
 
 func (sw *ServiceWatcher) deleteService(service *v1.Service, target ExportTarget) {
