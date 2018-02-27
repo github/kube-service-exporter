@@ -28,8 +28,11 @@ func main() {
 	consulHost := viper.GetString("CONSUL_HOST")
 	consulPort := viper.GetInt("CONSUL_PORT")
 
-	log.Printf("Watching the following namespaces: %v", namespaces)
+	if !viper.IsSet("CLUSTER_ID") {
+		log.Fatalf("Please set the KSE_CLUSTER_ID environment variable to a unique cluster Id")
+	}
 
+	log.Printf("Watching the following namespaces: %v", namespaces)
 	stoppedC := make(chan struct{})
 
 	ic, err := controller.NewInformerConfig()
