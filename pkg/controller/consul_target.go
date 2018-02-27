@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/pkg/errors"
+
 	"github.com/github/kube-service-exporter/pkg/leader"
 	capi "github.com/hashicorp/consul/api"
 )
