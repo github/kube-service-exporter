@@ -27,12 +27,13 @@ func main() {
 	kvPrefix := viper.GetString("CONSUL_KV_PREFIX")
 	consulHost := viper.GetString("CONSUL_HOST")
 	consulPort := viper.GetInt("CONSUL_PORT")
+	podName := viper.GetString("POD_NAME")
 
 	if !viper.IsSet("CLUSTER_ID") {
 		log.Fatalf("Please set the KSE_CLUSTER_ID environment variable to a unique cluster Id")
 	}
 
-	log.Printf("Watching the following namespaces: %v", namespaces)
+	log.Printf("Watching the following namespaces: %+v", namespaces)
 	stoppedC := make(chan struct{})
 
 	ic, err := controller.NewInformerConfig()
@@ -50,7 +51,7 @@ func main() {
 	consulCfg.Address = fmt.Sprintf("%s:%d", consulIPs[0].String(), consulPort)
 	log.Printf("Using Consul agent at %s", consulCfg.Address)
 
-	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId)
+	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId, podName)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -16,6 +16,7 @@ type LeaderElector interface {
 type ConsulLeaderElector struct {
 	client    *capi.Client
 	clusterId string
+	clientId  string
 	isLeader  bool
 	mutex     *sync.RWMutex
 	prefix    string
@@ -25,7 +26,7 @@ type ConsulLeaderElector struct {
 
 var _ LeaderElector = (*ConsulLeaderElector)(nil)
 
-func NewConsulLeaderElector(cfg *capi.Config, prefix string, clusterId string) (*ConsulLeaderElector, error) {
+func NewConsulLeaderElector(cfg *capi.Config, prefix string, clusterId string, clientId string) (*ConsulLeaderElector, error) {
 	client, err := capi.NewClient(cfg)
 	if err != nil {
 		return nil, err
@@ -33,6 +34,7 @@ func NewConsulLeaderElector(cfg *capi.Config, prefix string, clusterId string) (
 
 	return &ConsulLeaderElector{
 		client:    client,
+		clientId:  clientId,
 		clusterId: clusterId,
 		mutex:     &sync.RWMutex{},
 		prefix:    prefix,
@@ -66,7 +68,7 @@ func (le *ConsulLeaderElector) Run() error {
 
 	lo := &capi.LockOptions{
 		Key:   le.leaderKey(),
-		Value: []byte(""),
+		Value: []byte(le.clientId),
 	}
 
 	lock, err := le.client.LockOpts(lo)
@@ -83,17 +85,22 @@ func (le *ConsulLeaderElector) Run() error {
 
 		// we are the leader until lockC is closed or the service stops
 		le.setIsLeader(true)
+		log.Println("Elected leader")
 
 		select {
 		case <-lockC:
-			le.setIsLeader(false)
-			lock.Unlock()
+			le.stepDown(lock)
 		case <-le.stopC:
-			le.setIsLeader(false)
-			lock.Unlock()
+			le.stepDown(lock)
 			return nil
 		}
 	}
+}
+
+func (le *ConsulLeaderElector) stepDown(lock *capi.Lock) {
+	le.setIsLeader(false)
+	lock.Unlock()
+	log.Println("Leadership relinquished")
 }
 
 func (le *ConsulLeaderElector) Stop() {

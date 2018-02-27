@@ -30,3 +30,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: KSE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name

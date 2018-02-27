@@ -13,6 +13,7 @@ import (
 const (
 	KvPrefix  = "kse-test"
 	ClusterId = "cluster1"
+	ClientId  = "pod1"
 )
 
 type ConsulLeaderElectorSuite struct {
@@ -49,7 +50,7 @@ func TestConsulLeaderElectorSuite(t *testing.T) {
 func (s *ConsulLeaderElectorSuite) SetupTest() {
 	s.consulServer = tests.NewTestingConsulServer(s.T())
 	s.consulServer.Start()
-	elector, err := NewConsulLeaderElector(s.consulServer.Config, KvPrefix, ClusterId)
+	elector, err := NewConsulLeaderElector(s.consulServer.Config, KvPrefix, ClusterId, ClientId)
 	require.NoError(s.T(), err)
 	s.elector = elector
 	go s.elector.Run()
@@ -67,7 +68,7 @@ func (s *ConsulLeaderElectorSuite) TestElection() {
 	})
 
 	s.T().Run("There can only be one leader", func(t *testing.T) {
-		elector2, err := NewConsulLeaderElector(s.consulServer.Config, KvPrefix, ClusterId)
+		elector2, err := NewConsulLeaderElector(s.consulServer.Config, KvPrefix, ClusterId, "pod2")
 		s.NoError(err)
 		s.NotNil(elector2)
 		go elector2.Run()
@@ -85,14 +86,14 @@ func (s *ConsulLeaderElectorSuite) TestElection() {
 func TestNewElection(t *testing.T) {
 	consulServer := tests.NewTestingConsulServer(t)
 	consulServer.Start()
-	elector1, err := NewConsulLeaderElector(consulServer.Config, KvPrefix, ClusterId)
+	elector1, err := NewConsulLeaderElector(consulServer.Config, KvPrefix, ClusterId, ClientId)
 	require.NoError(t, err)
 	go elector1.Run()
 
 	require.True(t, WaitForHasLeader(elector1))
 	assert.True(t, elector1.IsLeader())
 
-	elector2, err := NewConsulLeaderElector(consulServer.Config, KvPrefix, ClusterId)
+	elector2, err := NewConsulLeaderElector(consulServer.Config, KvPrefix, ClusterId, "pod2")
 	go elector2.Run()
 	elector1.Stop()
 
