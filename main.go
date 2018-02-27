@@ -48,6 +48,7 @@ func main() {
 
 	consulCfg := capi.DefaultConfig()
 	consulCfg.Address = fmt.Sprintf("%s:%d", consulIPs[0].String(), consulPort)
+	log.Printf("Using Consul agent at %s", consulCfg.Address)
 
 	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId)
 	if err != nil {

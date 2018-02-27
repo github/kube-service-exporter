@@ -76,6 +76,7 @@ func NewServiceWatcher(config *InformerConfig, namespaces []string, clusterId st
 					log.Println("AddFunc received invalid Service: ", svc)
 					return
 				}
+				log.Println(svc.Name)
 
 				// ignore namespaces we don't care about
 				if !util.StringInSlice(svc.Namespace, namespaces) {
