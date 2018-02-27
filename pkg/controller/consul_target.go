@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -45,11 +46,11 @@ func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 
 	hasLeader, err := t.elector.HasLeader()
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "Unable to determine leader")
 	}
 
 	if !hasLeader {
-		return false, fmt.Errorf("No leader found, refusing to create %s", es.Id())
+		return false, errors.Wrapf(err, "No leader found, refusing to create %s", es.Id())
 	}
 
 	if err := t.client.Agent().ServiceRegister(asr); err != nil {
@@ -57,6 +58,7 @@ func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 	}
 
 	if t.elector.IsLeader() {
+		log.Printf("[LEADER] Writing KV metadata for %s", es.Id())
 		if err := t.writeKV(es); err != nil {
 			return false, err
 		}

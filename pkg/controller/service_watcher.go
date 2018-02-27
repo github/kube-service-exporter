@@ -81,7 +81,6 @@ func NewServiceWatcher(config *InformerConfig, namespaces []string, clusterId st
 				if !util.StringInSlice(svc.Namespace, namespaces) {
 					return
 				}
-				log.Printf("In AddFunc for %s/%s", svc.Namespace, svc.Name)
 
 				sw.addService(obj.(*v1.Service), target)
 			},
