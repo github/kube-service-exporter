@@ -78,7 +78,17 @@ func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	if t.elector.IsLeader() {
+		log.Printf("[LEADER] Deleting KV metadata for %s", es.Id())
+		t.client.KV().DeleteTree(t.metadataPrefix(es), &capi.WriteOptions{})
+	}
+
 	return true, nil
+}
+
+func (t *ConsulTarget) metadataPrefix(es *ExportedService) string {
+	return fmt.Sprintf("%s/services/%s/clusters/%s", t.kvPrefix, es.Id(), es.ClusterId)
 }
 
 // Write out metadata to where it belongs using a transaction
@@ -99,7 +109,7 @@ func (t *ConsulTarget) writeKV(es *ExportedService) error {
 	for k, v := range kvPairs {
 		op := &capi.KVTxnOp{
 			Verb:  capi.KVSet,
-			Key:   fmt.Sprintf("%s/%s/clusters/%s/%s", t.kvPrefix, es.Id(), es.ClusterId, k),
+			Key:   fmt.Sprintf("%s/%s", t.metadataPrefix(es), k),
 			Value: []byte(v),
 		}
 		ops = append(ops, op)

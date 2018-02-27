@@ -127,7 +127,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 		}
 
 		for k, v := range expectations {
-			key := fmt.Sprintf("%s/%s-%s-%s/clusters/%s/%s", KvPrefix, es.Namespace, es.Name, es.PortName, es.ClusterId, k)
+			key := fmt.Sprintf("%s/services/%s-%s-%s/clusters/%s/%s", KvPrefix, es.Namespace, es.Name, es.PortName, es.ClusterId, k)
 			pair, _, err := kv.Get(key, &capi.QueryOptions{})
 			s.NoErrorf(err, "Expected err for %s to be nil, got %+v", key, err)
 			s.NotNilf(pair, "expected KVPair for %s to be not nil", key)
@@ -145,6 +145,8 @@ func (s *ConsulTargetSuite) TestDelete() {
 		Name:      "name1",
 		PortName:  "http",
 		Port:      32001}
+	kv := s.consulServer.Client.KV()
+	prefix := fmt.Sprintf("%s/services/ns1-name1-http/clusters/%s", KvPrefix, ClusterId)
 
 	ok, err := s.target.Create(es)
 	s.NoError(err)
@@ -154,9 +156,17 @@ func (s *ConsulTargetSuite) TestDelete() {
 	_, found := services["ns1-name1-http"]
 	s.True(found)
 
+	keys, _, err := kv.List(prefix, &capi.QueryOptions{})
+	s.NoError(err)
+	s.NotEmpty(keys)
+
 	ok, err = s.target.Delete(es)
 	s.NoError(err)
 	s.True(ok)
+
+	keys, _, err = kv.List(prefix, &capi.QueryOptions{})
+	s.NoError(err)
+	s.Empty(keys)
 
 	services, err = s.consulServer.Client.Agent().Services()
 	_, found = services["ns1-name1-http"]
