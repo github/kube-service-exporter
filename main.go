@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -36,8 +37,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Get the IP for the local consul agent since we need it in a few places
+	consulIPs, err := net.LookupIP(consulHost)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	consulCfg := capi.DefaultConfig()
-	consulCfg.Address = fmt.Sprintf("%s:%d", consulHost, consulPort)
+	consulCfg.Address = fmt.Sprintf("%s:%d", consulIPs[0].String(), consulPort)
 
 	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId)
 	if err != nil {
