@@ -46,20 +46,6 @@ func (s *ConsulTargetSuite) SetupTest() {
 	s.consulServer.Start()
 	elector := &fakeElector{isLeader: true, hasLeader: true}
 	s.target, _ = NewConsulTarget(s.consulServer.Config, KvPrefix, ClusterId, elector)
-
-	// wait until elected
-	/*
-		for i := 0; i < 5; i++ {
-			if s.target.IsLeader() {
-				break
-			}
-			time.Sleep(time.Duration(i*100) * time.Millisecond)
-		}
-
-		if !s.target.IsLeader() {
-			s.T().Fatal("Leader never elected")
-		}
-	*/
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {
