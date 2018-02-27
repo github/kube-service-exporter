@@ -49,6 +49,10 @@
   name = "k8s.io/client-go"
   version = "6.0.0"
 
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "v0.8.0"
+
 [prune]
   go-tests = true
   unused-packages = true
