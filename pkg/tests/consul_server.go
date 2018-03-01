@@ -34,7 +34,7 @@ func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
 	// find a random unused port for Consul to listen on just to reduce the
 	// probability that we talk to a production Consul.  This is racey, but
 	// should be fine since it's unlikely someone is going to run a consul on
-	// our random port between closing this dummy listener and starting aConsul.
+	// our random port between closing this dummy listener and starting a Consul.
 	nodeName := fmt.Sprintf("consul-test-server-%s", port)
 	cmd := exec.Command("consul", "agent", "-dev",
 		"-http-port", port, "-bind=127.0.0.1",

@@ -103,9 +103,11 @@ func (t *ConsulTarget) writeKV(es *ExportedService) error {
 		"load_balancer_class": es.LoadBalancerClass,
 	}
 
-	// write out the cluster name as a key
 	ops := make([]*capi.KVTxnOp, 0, len(kvPairs))
 
+	// write out the cluster-level key explicitly so it can be enumerated with
+	// a consul-template ls operation
+	ops = append(ops, &capi.KVTxnOp{Verb: capi.KVSet, Key: t.metadataPrefix(es)})
 	for k, v := range kvPairs {
 		op := &capi.KVTxnOp{
 			Verb:  capi.KVSet,
@@ -123,7 +125,7 @@ func (t *ConsulTarget) asrFromExportedService(es *ExportedService) *capi.AgentSe
 	return &capi.AgentServiceRegistration{
 		ID:      es.Id(),
 		Name:    es.Id(),
-		Tags:    []string{es.ClusterId},
+		Tags:    []string{es.ClusterId, "kube-service-exporter"},
 		Port:    int(es.Port),
 		Address: t.hostIP,
 		Check: &capi.AgentServiceCheck{
