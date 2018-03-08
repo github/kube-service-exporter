@@ -1,0 +1,36 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-service-exporter
+  namespace: kube-system
+  labels:
+    k8s-app: kube-system
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-service-exporter
+    spec:
+      containers:
+      - name: kube-service-exporter
+        image: kube-service-exporter
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "256Mi"
+          limits:
+            cpu: "250m"
+            memory: "512Mi"
+        env:
+        - name: KSE_CONSUL_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KSE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name

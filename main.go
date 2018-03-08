@@ -1,39 +1,94 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"github.com/github/kube-service-exporter/pkg/controller"
+	"github.com/github/kube-service-exporter/pkg/leader"
+	capi "github.com/hashicorp/consul/api"
+	"github.com/spf13/viper"
 )
 
-func NewClientSet() (kubernetes.Interface, error) {
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-	config, err := kubeConfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return kubernetes.NewForConfig(config)
-}
-
 func main() {
-	namespaces := make([]string, 0, 5)
+	viper.SetEnvPrefix("KSE")
+	viper.AutomaticEnv()
+	viper.SetDefault("CONSUL_KV_PREFIX", "kube-service-exporter")
+	viper.SetDefault("CONSUL_HOST", "127.0.0.1")
+	viper.SetDefault("CONSUL_PORT", 8500)
 
-	cs, err := NewClientSet()
+	namespaces := viper.GetStringSlice("NAMESPACE_LIST")
+	clusterId := viper.GetString("CLUSTER_ID")
+	kvPrefix := viper.GetString("CONSUL_KV_PREFIX")
+	consulHost := viper.GetString("CONSUL_HOST")
+	consulPort := viper.GetInt("CONSUL_PORT")
+	podName := viper.GetString("POD_NAME")
+
+	if !viper.IsSet("CLUSTER_ID") {
+		log.Fatalf("Please set the KSE_CLUSTER_ID environment variable to a unique cluster Id")
+	}
+
+	log.Printf("Watching the following namespaces: %+v", namespaces)
+	stoppedC := make(chan struct{})
+
+	ic, err := controller.NewInformerConfig()
 	if err != nil {
-		log.Fatalf("Unable to acquire a clientset: %v", err)
+		log.Fatal(err)
 	}
 
-	nsList, err := cs.CoreV1().Namespaces().List(meta_v1.ListOptions{})
+	// Get the IP for the local consul agent since we need it in a few places
+	consulIPs, err := net.LookupIP(consulHost)
 	if err != nil {
-		log.Fatalf("Unable to list namespaces: %v", err)
+		log.Fatal(err)
 	}
 
-	for _, ns := range nsList.Items {
-		namespaces = append(namespaces, ns.Name)
+	consulCfg := capi.DefaultConfig()
+	consulCfg.Address = fmt.Sprintf("%s:%d", consulIPs[0].String(), consulPort)
+	log.Printf("Using Consul agent at %s", consulCfg.Address)
+
+	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId, podName)
+	if err != nil {
+		log.Fatal(err)
 	}
-	log.Printf("These are the namespaces: %v\n", namespaces)
+	go func() {
+		if err := elector.Run(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	target, err := controller.NewConsulTarget(consulCfg, kvPrefix, clusterId, elector)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
+	go sw.Run()
+
+	sigC := make(chan os.Signal, 1)
+	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
+	<-sigC
+	log.Println("Shutting down...")
+
+	go func() {
+		defer close(stoppedC)
+		sw.Stop()
+		log.Println("Stopped Service Watcher.")
+		elector.Stop()
+		log.Println("Stopped Consul leadership elector.")
+	}()
+
+	// make sure stops don't take too long
+	timer := time.NewTimer(5 * time.Second)
+	select {
+	case <-timer.C:
+		log.Println("goroutines took too long to stop. Exiting.")
+	case <-stoppedC:
+		log.Println("Stopped.")
+	}
+	os.Stdout.Sync()
 }

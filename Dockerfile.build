@@ -1,4 +1,4 @@
-FROM golang:1.9
+FROM golang:1.10
 LABEL cibuild.context-stream=tar
 
 ARG CONSUL_URL="https://releases.hashicorp.com/consul/1.0.6/consul_1.0.6_linux_amd64.zip"
