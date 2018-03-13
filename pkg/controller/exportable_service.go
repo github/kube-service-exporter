@@ -11,7 +11,7 @@ const (
 	// ServiceAnnotationExported is a boolean that determines whether or not to
 	// export the service.  Its value is not stored anywhere in the
 	// ExportedService, but it is used in IsExportable()
-	ServiceAnnotationExported = "kube-service-export.github.com/exported"
+	ServiceAnnotationExported = "kube-service-exporter.github.com/exported"
 
 	// ServiceAnnotationLoadBalancerProxyProtocol is the annotation used on the
 	// service to signal that the proxy protocol should be enabled.  Set to
