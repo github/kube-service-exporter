@@ -153,8 +153,8 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	// Delete services that are no longer exportable (because they aren't LoadBalancer)
-	if IsExportableService(oldService) && !IsExportableService(newService) {
+	// Delete services that are not exportable (because they aren't LoadBalancer/opt-in)
+	if !IsExportableService(newService) {
 		sw.deleteService(oldService, target)
 	}
 
