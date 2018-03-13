@@ -2,8 +2,8 @@ package tests
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
-	"os"
 	"os/exec"
 	"strconv"
 	"syscall"
@@ -39,8 +39,8 @@ func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
 	cmd := exec.Command("consul", "agent", "-dev",
 		"-http-port", port, "-bind=127.0.0.1",
 		"-node", nodeName)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = ioutil.Discard
+	cmd.Stderr = ioutil.Discard
 
 	return &TestingConsulServer{
 		cmd:      cmd,
