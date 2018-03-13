@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 )
 
@@ -149,8 +150,12 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 		es.HealthCheckPort = int32(port)
 	}
 
-	if service.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] == "false" {
-		es.ServicePerCluster = false
+	if val, ok := service.Annotations[ServiceAnnotationLoadBalancerServicePerCluster]; ok {
+		parsed, err := strconv.ParseBool(val)
+		if err != nil {
+			return nil, errors.Wrap(err, "Error setting ServicePerCluster")
+		}
+		es.ServicePerCluster = parsed
 	}
 
 	return es, nil
