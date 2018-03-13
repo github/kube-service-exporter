@@ -2,10 +2,8 @@ package tests
 
 import (
 	"fmt"
-	"net"
-	"os"
+	"io/ioutil"
 	"os/exec"
-	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -13,6 +11,8 @@ import (
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 )
+
+const ConsulPort = "28500" // some port that's not Consul's production port
 
 type TestingConsulServer struct {
 	cmd      *exec.Cmd
@@ -24,23 +24,14 @@ type TestingConsulServer struct {
 
 func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
 	t.Helper()
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
-	listener.Close()
 	config := capi.DefaultConfig()
-	config.Address = listener.Addr().String()
-
-	// find a random unused port for Consul to listen on just to reduce the
-	// probability that we talk to a production Consul.  This is racey, but
-	// should be fine since it's unlikely someone is going to run a consul on
-	// our random port between closing this dummy listener and starting a Consul.
-	nodeName := fmt.Sprintf("consul-test-server-%s", port)
+	config.Address = fmt.Sprintf("127.0.0.1:%s", ConsulPort)
+	nodeName := fmt.Sprintf("consul-test-server-%s", ConsulPort)
 	cmd := exec.Command("consul", "agent", "-dev",
-		"-http-port", port, "-bind=127.0.0.1",
+		"-http-port", ConsulPort, "-bind=127.0.0.1",
 		"-node", nodeName)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = ioutil.Discard
+	cmd.Stderr = ioutil.Discard
 
 	return &TestingConsulServer{
 		cmd:      cmd,
@@ -49,7 +40,7 @@ func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
 		Config:   config}
 }
 
-// Start consul in dev mode on a random port for testing against
+// Start consul in dev mode
 // Logs will go to stdout/stderr
 // Each outer Test* func will get a freshly restarted consul
 func (server *TestingConsulServer) Start() {
