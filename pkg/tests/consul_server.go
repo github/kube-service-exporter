@@ -74,7 +74,7 @@ func (server *TestingConsulServer) Start() {
 	}()
 
 	// make sure the start doesn't take to long
-	timer := time.NewTimer(2 * time.Second)
+	timer := time.NewTimer(5 * time.Second)
 	select {
 	case <-timer.C:
 		server.t.Fatal("Took too long to start consul")
