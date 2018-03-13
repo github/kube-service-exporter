@@ -114,6 +114,9 @@ func (s *ServiceWatcherSuite) SetupTest() {
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      "service1",
 			Namespace: "default",
+			Annotations: map[string]string{
+				ServiceAnnotationExported: "true",
+			},
 		},
 		Spec: v1.ServiceSpec{
 			Type: "LoadBalancer",

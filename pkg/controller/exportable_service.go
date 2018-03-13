@@ -8,6 +8,11 @@ import (
 )
 
 const (
+	// ServiceAnnotationExported is a boolean that determines whether or not to
+	// export the service.  Its value is not stored anywhere in the
+	// ExportedService, but it is used in IsExportable()
+	ServiceAnnotationExported = "kube-service-export.github.com/exported"
+
 	// ServiceAnnotationLoadBalancerProxyProtocol is the annotation used on the
 	// service to signal that the proxy protocol should be enabled.  Set to
 	// "*" to indicate that all backends should support Proxy Protocol.
@@ -157,5 +162,14 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 }
 
 func IsExportableService(service *v1.Service) bool {
-	return service.Spec.Type == v1.ServiceTypeLoadBalancer
+	var exported bool
+
+	if val, ok := service.Annotations[ServiceAnnotationExported]; ok {
+		parsed, err := strconv.ParseBool(val)
+		if err != nil {
+			return false
+		}
+		exported = parsed
+	}
+	return exported && service.Spec.Type == v1.ServiceTypeLoadBalancer
 }
