@@ -106,6 +106,13 @@ func TestNewExportedService(t *testing.T) {
 		assert.False(t, es.ServicePerCluster)
 		assert.Equal(t, "internal", es.LoadBalancerClass)
 	})
+
+	t.Run("Malformed ServicePerCluster Annotation", func(t *testing.T) {
+		svc := ServiceFixture()
+		svc.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] = "pants"
+		_, err := NewExportedService(svc, "cluster", 0)
+		assert.Error(t, err)
+	})
 }
 
 func TestNewExportedServicesFromKubeServices(t *testing.T) {
