@@ -60,7 +60,7 @@ func (t *fakeTarget) Update(es *ExportedService) (bool, error) {
 		t.EventC <- "update"
 		return true, nil
 	}
-	return false, nil
+	return t.Create(es)
 }
 
 func (t *fakeTarget) Delete(es *ExportedService) (bool, error) {
@@ -114,6 +114,9 @@ func (s *ServiceWatcherSuite) SetupTest() {
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      "service1",
 			Namespace: "default",
+			Annotations: map[string]string{
+				ServiceAnnotationExported: "true",
+			},
 		},
 		Spec: v1.ServiceSpec{
 			Type: "LoadBalancer",
@@ -139,38 +142,61 @@ func (s *ServiceWatcherSuite) TearDownTest() {
 // until it has gone thru the fake export target via the ListerWatcher
 // Modify sometimes will trigger a delete, so what to expect can be configured
 // by passing in "delete" or "update" to expect
-func (s *ServiceWatcherSuite) SourceExec(f func(runtime.Object), service *v1.Service, expect string) {
+func (s *ServiceWatcherSuite) SourceExec(f func(runtime.Object), service *v1.Service, expects []string) {
 	f(service)
-	for i := 0; i < len(service.Spec.Ports); i++ {
-		val := chanRecvWithTimeout(s.T(), s.target.EventC)
-		s.Equal(expect, val)
+	for _, expect := range expects {
+		for i := 0; i < len(service.Spec.Ports); i++ {
+			val := chanRecvWithTimeout(s.T(), s.target.EventC)
+			s.Equal(expect, val)
+		}
 	}
 }
 
 func (s *ServiceWatcherSuite) TestAdd() {
-	s.SourceExec(s.source.Add, s.serviceFixture, "create")
+	s.SourceExec(s.source.Add, s.serviceFixture, []string{"create"})
 	s.Len(s.target.Store, 2)
 }
 
 func (s *ServiceWatcherSuite) TestUpdate() {
-	s.SourceExec(s.source.Add, s.serviceFixture, "create")
-	s.SourceExec(s.source.Modify, s.serviceFixture, "update")
+	s.SourceExec(s.source.Add, s.serviceFixture, []string{"create"})
+	s.SourceExec(s.source.Modify, s.serviceFixture, []string{"update"})
 	s.Len(s.target.Store, 2)
 }
 
 func (s *ServiceWatcherSuite) TestDelete() {
-	s.SourceExec(s.source.Add, s.serviceFixture, "create")
-	s.SourceExec(s.source.Delete, s.serviceFixture, "delete")
+	s.SourceExec(s.source.Add, s.serviceFixture, []string{"create"})
+	s.SourceExec(s.source.Delete, s.serviceFixture, []string{"delete"})
 	s.Len(s.target.Store, 0)
 }
 
 func (s *ServiceWatcherSuite) TestUpdateTriggersDelete() {
 	svc := *s.serviceFixture
-	s.SourceExec(s.source.Add, &svc, "create")
+	s.SourceExec(s.source.Add, &svc, []string{"create"})
 	s.Len(s.target.Store, 2)
 	svc.Spec.Type = "NodePort"
-	s.SourceExec(s.source.Modify, &svc, "delete")
+	s.SourceExec(s.source.Modify, &svc, []string{"delete"})
 	s.Len(s.target.Store, 0)
+}
+
+func (s *ServiceWatcherSuite) TestUpdateIdTriggersReplace() {
+	before := make([]string, 0, 2)
+	after := make([]string, 0, 2)
+	svc := *s.serviceFixture
+	s.SourceExec(s.source.Add, &svc, []string{"create"})
+	s.Len(s.target.Store, 2)
+	for _, es := range s.target.Store {
+		before = append(before, es.Id())
+	}
+	s.ElementsMatch(before, []string{"cluster-default-service1-http", "cluster-default-service1-thing"})
+
+	svc.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] = "false"
+
+	s.SourceExec(s.source.Modify, &svc, []string{"create", "delete"})
+	for _, es := range s.target.Store {
+		after = append(after, es.Id())
+	}
+	s.Len(s.target.Store, 2)
+	s.ElementsMatch(after, []string{"default-service1-http", "default-service1-thing"})
 }
 
 func TestServiceWatcherSuite(t *testing.T) {

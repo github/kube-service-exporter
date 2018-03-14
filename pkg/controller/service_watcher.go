@@ -153,13 +153,17 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 	defer sw.wg.Done()
 	sw.wg.Add(1)
 
-	// Delete services that are no longer exportable (because they aren't LoadBalancer)
-	if IsExportableService(oldService) && !IsExportableService(newService) {
+	// Delete services that are not exportable (because they aren't LoadBalancer/opt-in)
+	if !IsExportableService(newService) {
+		// delete the 
 		sw.deleteService(oldService, target)
 	}
 
+	newIds := make(map[string]bool)
+
 	newExportedServices, _ := NewExportedServicesFromKubeService(newService, sw.clusterId)
 	for _, es := range newExportedServices {
+		newIds[es.Id()] = true
 		log.Printf("Update service %+v", es)
 		_, err := target.Update(es)
 		if err != nil {
@@ -167,8 +171,16 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 		}
 	}
 
-	// TODO delete ExportedServices that are in old, but not new (by Id)
-	// This should cover renaming the port name
+	// delete ExportedServices that are in old, but not new (by Id)
+	// This should cover renaming the port name, or a change in other metadata
+	// such as ServicePerCluster
+	oldExportedServices, _ := NewExportedServicesFromKubeService(oldService, sw.clusterId)
+	for _, es := range oldExportedServices {
+		if _, ok := newIds[es.Id()]; !ok {
+			log.Printf("Delete service %+v due to Id change", es)
+			target.Delete(es)
+		}
+	}
 }
 
 func (sw *ServiceWatcher) deleteService(service *v1.Service, target ExportTarget) {

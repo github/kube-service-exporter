@@ -11,9 +11,11 @@ import (
 func ServiceFixture() *v1.Service {
 	return &v1.Service{
 		ObjectMeta: meta_v1.ObjectMeta{
-			Name:        "service1",
-			Namespace:   "default",
-			Annotations: map[string]string{},
+			Name:      "service1",
+			Namespace: "default",
+			Annotations: map[string]string{
+				ServiceAnnotationExported: "true",
+			},
 		},
 		Spec: v1.ServiceSpec{
 			Type: "LoadBalancer",
@@ -30,11 +32,34 @@ func ServiceFixture() *v1.Service {
 }
 
 func TestIsExportableService(t *testing.T) {
-	svc := ServiceFixture()
-	assert.True(t, IsExportableService(svc))
+	t.Run("Service is exportable", func(t *testing.T) {
+		svc := ServiceFixture()
+		assert.True(t, IsExportableService(svc))
+	})
 
-	svc.Spec.Type = "NodePort"
-	assert.False(t, IsExportableService(svc))
+	t.Run("NodePort Service is not exportable", func(t *testing.T) {
+		svc := ServiceFixture()
+		svc.Spec.Type = "NodePort"
+		assert.False(t, IsExportableService(svc))
+	})
+
+	t.Run("Service w/out exported annotation is not exportable", func(t *testing.T) {
+		svc := ServiceFixture()
+		delete(svc.Annotations, ServiceAnnotationExported)
+		assert.False(t, IsExportableService(svc))
+	})
+
+	t.Run("Service with exported annotation set to false is not exportable", func(t *testing.T) {
+		svc := ServiceFixture()
+		svc.Annotations[ServiceAnnotationExported] = "false"
+		assert.False(t, IsExportableService(svc))
+	})
+
+	t.Run("Service with non-bool exported annotation is not exportable", func(t *testing.T) {
+		svc := ServiceFixture()
+		svc.Annotations[ServiceAnnotationExported] = "pants"
+		assert.False(t, IsExportableService(svc))
+	})
 }
 
 func TestNewExportedService(t *testing.T) {
