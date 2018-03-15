@@ -28,6 +28,9 @@ const (
 	// Options are `http` or `tcp` for HTTP backends or TCP backends
 	ServiceAnnotationLoadBalancerBEProtocol = "kube-service-exporter.github.com/load-balancer-backend-protocol"
 
+	// The port the load balancer should listen on for requests routed to this service
+	ServiceAnnotationLoadBalancerListenPort = "kube-service-exporter.github.com/load-balancer-listen-port"
+
 	// A path for an HTTP Health check.
 	ServiceAnnotationLoadBalancerHealthCheckPath = "kube-service-exporter.github.com/load-balancer-health-check-path"
 	// The port for a the Health check. If unset, defaults to the NodePort.
@@ -69,6 +72,9 @@ type ExportedService struct {
 	// LoadBalancerClass can be used to target the service at a specific load
 	// balancer (e.g. "internal", "public"
 	LoadBalancerClass string
+
+	// the port the load balancer should listen on
+	LoadBalancerListenPort int32
 }
 
 // NewExportedServicesFromKubeService returns a slice of ExportedServices, one
@@ -141,6 +147,14 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 
 	if service.Annotations[ServiceAnnotationLoadBalancerBEProtocol] == "tcp" {
 		es.BackendProtocol = "tcp"
+	}
+
+	if val, ok := service.Annotations[ServiceAnnotationLoadBalancerListenPort]; ok {
+		port, err := strconv.ParseInt(val, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("Error setting LoadBalancerListenPort: %v", err)
+		}
+		es.LoadBalancerListenPort = int32(port)
 	}
 
 	if val, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthCheckPath]; ok {

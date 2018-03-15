@@ -94,13 +94,14 @@ func (t *ConsulTarget) metadataPrefix(es *ExportedService) string {
 // Write out metadata to where it belongs using a transaction
 func (t *ConsulTarget) writeKV(es *ExportedService) error {
 	kvPairs := map[string]string{
-		"cluster_name":        es.ClusterId,
-		"proxy_protocol":      strconv.FormatBool(es.ProxyProtocol),
-		"backend_protocol":    es.BackendProtocol,
-		"health_check_path":   es.HealthCheckPath,
-		"health_check_port":   strconv.Itoa(int(es.HealthCheckPort)),
-		"dns_name":            es.DNSName,
-		"load_balancer_class": es.LoadBalancerClass,
+		"cluster_name":              es.ClusterId,
+		"proxy_protocol":            strconv.FormatBool(es.ProxyProtocol),
+		"backend_protocol":          es.BackendProtocol,
+		"health_check_path":         es.HealthCheckPath,
+		"health_check_port":         strconv.Itoa(int(es.HealthCheckPort)),
+		"dns_name":                  es.DNSName,
+		"load_balancer_class":       es.LoadBalancerClass,
+		"load_balancer_listen_port": strconv.Itoa(int(es.LoadBalancerListenPort)),
 	}
 
 	ops := make([]*capi.KVTxnOp, 0, len(kvPairs))
