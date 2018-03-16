@@ -85,6 +85,7 @@ func TestNewExportedService(t *testing.T) {
 		assert.Equal(t, "http", es.BackendProtocol)
 		assert.Empty(t, es.HealthCheckPath)
 		assert.True(t, es.ServicePerCluster)
+		assert.Empty(t, es.LoadBalancerListenPort)
 	})
 
 	t.Run("Overridden defaults", func(t *testing.T) {
@@ -96,6 +97,7 @@ func TestNewExportedService(t *testing.T) {
 		svc.Annotations[ServiceAnnotationLoadBalancerHealthCheckPath] = "/foo/bar"
 		svc.Annotations[ServiceAnnotationLoadBalancerHealthCheckPort] = "32001"
 		svc.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] = "false"
+		svc.Annotations[ServiceAnnotationLoadBalancerListenPort] = "32768"
 
 		es, err := NewExportedService(svc, "cluster", portIdx)
 		assert.NoError(t, err)
@@ -105,6 +107,7 @@ func TestNewExportedService(t *testing.T) {
 		assert.Equal(t, int32(32001), es.HealthCheckPort)
 		assert.False(t, es.ServicePerCluster)
 		assert.Equal(t, "internal", es.LoadBalancerClass)
+		assert.Equal(t, int32(32768), es.LoadBalancerListenPort)
 	})
 
 	t.Run("Malformed ServicePerCluster Annotation", func(t *testing.T) {

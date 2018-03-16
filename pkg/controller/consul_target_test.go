@@ -120,10 +120,11 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.True(ok)
 
 		expectations := map[string]string{
-			"cluster_name":        ClusterId,
-			"proxy_protocol":      "false",
-			"health_check_port":   "32303",
-			"load_balancer_class": "internal",
+			"cluster_name":              ClusterId,
+			"proxy_protocol":            "false",
+			"health_check_port":         "32303",
+			"load_balancer_class":       "internal",
+			"load_balancer_listen_port": "0",
 		}
 
 		for k, v := range expectations {
