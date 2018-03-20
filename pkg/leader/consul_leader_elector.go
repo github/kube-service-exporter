@@ -54,9 +54,10 @@ func (le *ConsulLeaderElector) IsLeader() bool {
 }
 
 func (le *ConsulLeaderElector) HasLeader() (bool, error) {
-	kvPair, _, err := le.client.KV().Get(le.leaderKey(), &capi.QueryOptions{})
+	qo := capi.QueryOptions{RequireConsistent: true}
+	kvPair, _, err := le.client.KV().Get(le.leaderKey(), &qo)
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "In HasLeader")
 	}
 
 	if kvPair == nil {
