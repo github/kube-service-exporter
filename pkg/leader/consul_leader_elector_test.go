@@ -22,17 +22,6 @@ type ConsulLeaderElectorSuite struct {
 	elector      *ConsulLeaderElector
 }
 
-func WaitForHasLeader(elector LeaderElector) bool {
-	// it takes a bit before consul settles down enough to allow leader election
-	for i := 0; i < 10; i++ {
-		if ok, _ := elector.HasLeader(); ok {
-			return true
-		}
-		time.Sleep(time.Duration(i*10) * time.Millisecond)
-	}
-	return false
-}
-
 func WaitForIsLeader(elector LeaderElector) bool {
 	for i := 0; i < 10; i++ {
 		if elector.IsLeader() {
@@ -63,7 +52,7 @@ func (s *ConsulLeaderElectorSuite) TearDownTest() {
 
 func (s *ConsulLeaderElectorSuite) TestElection() {
 	s.T().Run("Acquires leadership", func(t *testing.T) {
-		s.True(WaitForHasLeader(s.elector))
+		s.NoError(s.elector.WaitForLeader(5*time.Second, 250*time.Millisecond))
 		s.True(s.elector.IsLeader())
 	})
 
@@ -90,7 +79,7 @@ func TestNewElection(t *testing.T) {
 	require.NoError(t, err)
 	go elector1.Run()
 
-	require.True(t, WaitForHasLeader(elector1))
+	assert.NoError(t, elector1.WaitForLeader(5*time.Second, 250*time.Millisecond))
 	assert.True(t, elector1.IsLeader())
 
 	elector2, err := NewConsulLeaderElector(consulServer.Config, KvPrefix, ClusterId, "pod2")

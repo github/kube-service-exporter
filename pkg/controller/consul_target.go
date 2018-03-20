@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -46,13 +47,9 @@ func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string, electo
 func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 	asr := t.asrFromExportedService(es)
 
-	hasLeader, err := t.elector.HasLeader()
-	if err != nil {
-		return false, errors.Wrap(err, "Unable to determine leader")
-	}
-
-	if !hasLeader {
-		return false, errors.Wrapf(err, "No leader found, refusing to create %s", es.Id())
+	wait := 15 * time.Second
+	if err := t.elector.WaitForLeader(wait, time.Second); err != nil {
+		return false, errors.Wrapf(err, "No leader found after %s, refusing to create %s", wait, es.Id())
 	}
 
 	if err := t.client.Agent().ServiceRegister(asr); err != nil {
