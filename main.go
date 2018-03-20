@@ -76,10 +76,10 @@ func main() {
 
 	go func() {
 		defer close(stoppedC)
-		sw.Stop()
-		log.Println("Stopped Service Watcher.")
 		elector.Stop()
 		log.Println("Stopped Consul leadership elector.")
+		sw.Stop()
+		log.Println("Stopped Service Watcher.")
 	}()
 
 	// make sure stops don't take too long
