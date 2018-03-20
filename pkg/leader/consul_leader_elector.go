@@ -64,6 +64,10 @@ func (le *ConsulLeaderElector) HasLeader() (bool, error) {
 		return false, nil
 	}
 
+	if kvPair.Session == "" {
+		return false, nil
+	}
+
 	return true, nil
 }
 
