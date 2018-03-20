@@ -93,8 +93,9 @@ func (le *ConsulLeaderElector) Run() error {
 	defer close(le.stoppedC)
 
 	lo := &capi.LockOptions{
-		Key:   le.leaderKey(),
-		Value: []byte(le.clientId),
+		Key:          le.leaderKey(),
+		Value:        []byte(le.clientId),
+		LockWaitTime: 5 * time.Second,
 	}
 
 	lock, err := le.client.LockOpts(lo)

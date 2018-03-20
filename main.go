@@ -83,7 +83,7 @@ func main() {
 	}()
 
 	// make sure stops don't take too long
-	timer := time.NewTimer(5 * time.Second)
+	timer := time.NewTimer(10 * time.Second)
 	select {
 	case <-timer.C:
 		log.Println("goroutines took too long to stop. Exiting.")
