@@ -76,14 +76,14 @@ func main() {
 
 	go func() {
 		defer close(stoppedC)
-		sw.Stop()
-		log.Println("Stopped Service Watcher.")
 		elector.Stop()
 		log.Println("Stopped Consul leadership elector.")
+		sw.Stop()
+		log.Println("Stopped Service Watcher.")
 	}()
 
 	// make sure stops don't take too long
-	timer := time.NewTimer(5 * time.Second)
+	timer := time.NewTimer(10 * time.Second)
 	select {
 	case <-timer.C:
 		log.Println("goroutines took too long to stop. Exiting.")

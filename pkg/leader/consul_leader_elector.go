@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	capi "github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 )
 
 type LeaderElector interface {
 	IsLeader() bool
 	HasLeader() (bool, error)
+	WaitForLeader(wait, tick time.Duration) error
 }
 
 type ConsulLeaderElector struct {
@@ -51,24 +54,52 @@ func (le *ConsulLeaderElector) IsLeader() bool {
 }
 
 func (le *ConsulLeaderElector) HasLeader() (bool, error) {
-	kvPair, _, err := le.client.KV().Get(le.leaderKey(), &capi.QueryOptions{})
+	qo := capi.QueryOptions{RequireConsistent: true}
+	kvPair, _, err := le.client.KV().Get(le.leaderKey(), &qo)
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "In HasLeader")
 	}
 
 	if kvPair == nil {
 		return false, nil
 	}
 
+	if kvPair.Session == "" {
+		return false, nil
+	}
+
 	return true, nil
+}
+
+// WaitForLeader waits for someone to acquire leadership. It returns an error
+// if the timer times out.
+// wait is how long to wait before timing out
+// tick is how often to check
+func (le *ConsulLeaderElector) WaitForLeader(wait, tick time.Duration) error {
+	waiter := time.NewTimer(wait)
+	ticker := time.NewTimer(tick)
+	defer waiter.Stop()
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-waiter.C:
+			return fmt.Errorf("No leader found after %s", wait)
+		case <-ticker.C:
+			if ok, _ := le.HasLeader(); ok {
+				return nil
+			}
+		}
+	}
 }
 
 func (le *ConsulLeaderElector) Run() error {
 	defer close(le.stoppedC)
 
 	lo := &capi.LockOptions{
-		Key:   le.leaderKey(),
-		Value: []byte(le.clientId),
+		Key:          le.leaderKey(),
+		Value:        []byte(le.clientId),
+		LockWaitTime: 5 * time.Second,
 	}
 
 	lock, err := le.client.LockOpts(lo)

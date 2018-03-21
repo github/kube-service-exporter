@@ -3,10 +3,12 @@ package controller
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/github/kube-service-exporter/pkg/leader"
 	"github.com/github/kube-service-exporter/pkg/tests"
 	capi "github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -27,6 +29,14 @@ func (fe *fakeElector) IsLeader() bool {
 
 func (fe *fakeElector) HasLeader() (bool, error) {
 	return fe.hasLeader, nil
+}
+
+// An impatient WaitForLeader that doesn't wait.
+func (fe *fakeElector) WaitForLeader(wait, tick time.Duration) error {
+	if fe.hasLeader {
+		return nil
+	}
+	return fmt.Errorf("timed out")
 }
 
 var _ leader.LeaderElector = (*fakeElector)(nil)
@@ -70,7 +80,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.True(found)
 
 		node, _, err := s.consulServer.Client.Catalog().Node(s.consulServer.NodeName, &capi.QueryOptions{})
-		s.NoError(err)
+		require.NoError(s.T(), err)
 		_, found = node.Services["ns1-name1-http"]
 		s.True(found)
 	})
