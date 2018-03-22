@@ -78,7 +78,7 @@ func NewServiceWatcher(config *InformerConfig, namespaces []string, clusterId st
 				}
 
 				// ignore namespaces we don't care about
-				if !util.StringInSlice(svc.Namespace, namespaces) {
+				if len(namespaces) > 0 && !util.StringInSlice(svc.Namespace, namespaces) {
 					return
 				}
 
@@ -98,7 +98,7 @@ func NewServiceWatcher(config *InformerConfig, namespaces []string, clusterId st
 				}
 
 				// ignore namespaces we don't care about
-				if !util.StringInSlice(oldSvc.Namespace, namespaces) {
+				if len(namespaces) > 0 && !util.StringInSlice(oldSvc.Namespace, namespaces) {
 					return
 				}
 				sw.updateService(oldSvc, newSvc, target)
@@ -111,7 +111,7 @@ func NewServiceWatcher(config *InformerConfig, namespaces []string, clusterId st
 				}
 
 				// ignore namespaces we don't care about
-				if !util.StringInSlice(svc.Namespace, namespaces) {
+				if len(namespaces) > 0 && !util.StringInSlice(svc.Namespace, namespaces) {
 					return
 				}
 
@@ -155,7 +155,7 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 
 	// Delete services that are not exportable (because they aren't LoadBalancer/opt-in)
 	if !IsExportableService(newService) {
-		// delete the 
+		// delete the
 		sw.deleteService(oldService, target)
 	}
 
