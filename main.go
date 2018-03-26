@@ -33,7 +33,9 @@ func main() {
 		log.Fatalf("Please set the KSE_CLUSTER_ID environment variable to a unique cluster Id")
 	}
 
-	log.Printf("Watching the following namespaces: %+v", namespaces)
+	if len(namespaces) > 0 {
+		log.Printf("Watching the following namespaces: %+v", namespaces)
+	}
 	stoppedC := make(chan struct{})
 
 	ic, err := controller.NewInformerConfig()
