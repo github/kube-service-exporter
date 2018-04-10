@@ -166,3 +166,22 @@ func TestId(t *testing.T) {
 		assert.Equal(t, "cluster-default-service1-32123", es.Id())
 	})
 }
+
+func TestHash(t *testing.T) {
+	es1, _ := NewExportedService(ServiceFixture(), "cluster", 0)
+	hash1, err := es1.Hash()
+	assert.Nil(t, err)
+	assert.NotEmpty(t, hash1)
+
+	es2, _ := NewExportedService(ServiceFixture(), "cluster", 0)
+	hash2, err := es2.Hash()
+	assert.Nil(t, err)
+	assert.NotEmpty(t, hash2)
+
+	assert.Equal(t, hash1, hash2, "identical ExportedServices should have same hash")
+
+	es2.Port += 1
+	hash3, err := es2.Hash()
+	assert.Nil(t, err)
+	assert.NotEqual(t, hash2, hash3, "different ExportedServices should have different hashes")
+}

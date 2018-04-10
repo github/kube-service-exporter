@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 )
@@ -178,6 +179,14 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 	}
 
 	return es, nil
+}
+
+func (es *ExportedService) Hash() (string, error) {
+	hash, err := hashstructure.Hash(es, nil)
+	if err != nil {
+		return "", err
+	}
+	return strconv.FormatUint(hash, 16), nil
 }
 
 func IsExportableService(service *v1.Service) bool {
