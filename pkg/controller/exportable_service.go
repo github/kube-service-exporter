@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -46,36 +47,36 @@ const (
 )
 
 type ExportedService struct {
-	ClusterId string
-	Namespace string
-	Name      string
+	ClusterId string `json:"ClusterName"`
+	Namespace string `json:"-"`
+	Name      string `json:"-"`
 
 	// The unique Name for the NodePort. If no name, defaults to the Port
-	PortName string
+	PortName string `json:"-"`
 	// The Port on which the Service is reachable
-	Port int32
+	Port int32 `json:"port"`
 
-	DNSName           string
-	ServicePerCluster bool
+	DNSName           string `json:"dns_name"`
+	ServicePerCluster bool   `json:"-"`
 
 	// an optional URI Path for the HealthCheck
-	HealthCheckPath string
+	HealthCheckPath string `json:"health_check_path"`
 
 	// HealthCheckPort is a port for the Health Check. Defaults to the NodePort
-	HealthCheckPort int32
+	HealthCheckPort int32 `json:"health_check_port"`
 
 	// TCP / HTTP
-	BackendProtocol string
+	BackendProtocol string `json:"backend_protocol"`
 
 	// Enable Proxy protocol on the backend
-	ProxyProtocol bool
+	ProxyProtocol bool `json:"proxy_protocol"`
 
 	// LoadBalancerClass can be used to target the service at a specific load
 	// balancer (e.g. "internal", "public"
-	LoadBalancerClass string
+	LoadBalancerClass string `json:"load_balancer_class"`
 
 	// the port the load balancer should listen on
-	LoadBalancerListenPort int32
+	LoadBalancerListenPort int32 `json:"load_balancer_listen_port"`
 }
 
 // NewExportedServicesFromKubeService returns a slice of ExportedServices, one
@@ -200,4 +201,23 @@ func IsExportableService(service *v1.Service) bool {
 		exported = parsed
 	}
 	return exported && service.Spec.Type == v1.ServiceTypeLoadBalancer
+}
+
+func (es *ExportedService) MarshalJSON() ([]byte, error) {
+	// alias to avoid recursive marshaling
+	type ExportedServiceMarshal ExportedService
+
+	hash, err := es.Hash()
+	if err != nil {
+		return nil, errors.Wrap(err, "Error generating hash during JSON Marshaling")
+	}
+
+	data := struct {
+		Hash string `json:"hash"`
+		ExportedServiceMarshal
+	}{
+		Hash: hash,
+		ExportedServiceMarshal: ExportedServiceMarshal(*es),
+	}
+	return json.Marshal(&data)
 }

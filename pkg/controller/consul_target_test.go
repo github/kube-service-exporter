@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -129,23 +130,16 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.NoError(err)
 		s.True(ok)
 
-		expectations := map[string]string{
-			"cluster_name":              ClusterId,
-			"proxy_protocol":            "false",
-			"health_check_port":         "32303",
-			"load_balancer_class":       "internal",
-			"load_balancer_listen_port": "0",
-		}
+		key := fmt.Sprintf("%s/services/%s-%s-%s/clusters/%s", KvPrefix, es.Namespace, es.Name, es.PortName, es.ClusterId)
+		pair, _, err := kv.Get(key, &capi.QueryOptions{})
+		s.NoErrorf(err, "Expected err for %s to be nil, got %+v", key, err)
+		s.NotNilf(pair, "expected KVPair for %s to be not nil", key)
 
-		for k, v := range expectations {
-			key := fmt.Sprintf("%s/services/%s-%s-%s/clusters/%s/%s", KvPrefix, es.Namespace, es.Name, es.PortName, es.ClusterId, k)
-			pair, _, err := kv.Get(key, &capi.QueryOptions{})
-			s.NoErrorf(err, "Expected err for %s to be nil, got %+v", key, err)
-			s.NotNilf(pair, "expected KVPair for %s to be not nil", key)
-			if pair != nil {
-				s.Equalf(v, string(pair.Value), k, "expected %s to be %s", v, string(pair.Value))
-			}
-		}
+		var meta map[string]interface{}
+
+		err = json.Unmarshal(pair.Value, &meta)
+		s.NoError(err)
+		s.Equal(meta["load_balancer_class"], "internal")
 	})
 }
 
