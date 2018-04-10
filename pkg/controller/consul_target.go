@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"reflect"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -52,11 +54,28 @@ func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 		return false, errors.Wrapf(err, "No leader found after %s, refusing to create %s", wait, es.Id())
 	}
 
-	if err := t.client.Agent().ServiceRegister(asr); err != nil {
-		return false, err
+	updateService, err := t.shouldUpdateService(asr)
+	if err != nil {
+		return false, errors.Wrap(err, "Error calling shouldUpdateService")
+	}
+
+	if updateService {
+		log.Printf("Updating Consul Service %s due to registration change", asr.ID)
+		if err := t.client.Agent().ServiceRegister(asr); err != nil {
+			return false, err
+		}
 	}
 
 	if t.elector.IsLeader() {
+		updateKV, err := t.shouldUpdateKV(es)
+		if err != nil {
+			return false, errors.Wrap(err, "Error calling shouldUpdateKV")
+		}
+
+		if !updateKV {
+			return true, nil
+		}
+
 		log.Printf("[LEADER] Writing KV metadata for %s", es.Id())
 		if err := t.writeKV(es); err != nil {
 			return false, err
@@ -88,9 +107,16 @@ func (t *ConsulTarget) metadataPrefix(es *ExportedService) string {
 	return fmt.Sprintf("%s/services/%s/clusters/%s", t.kvPrefix, es.Id(), es.ClusterId)
 }
 
-// Write out metadata to where it belongs using a transaction
+// Write out metadata to where it belongs in Consul using a transaction.  This
+// should only ever get called by the current leader
 func (t *ConsulTarget) writeKV(es *ExportedService) error {
+	hash, err := es.Hash()
+	if err != nil {
+		return errors.Wrap(err, "Error calling ExportedService.Hash()")
+	}
+
 	kvPairs := map[string]string{
+		"hash":                      hash,
 		"cluster_name":              es.ClusterId,
 		"proxy_protocol":            strconv.FormatBool(es.ProxyProtocol),
 		"backend_protocol":          es.BackendProtocol,
@@ -115,7 +141,7 @@ func (t *ConsulTarget) writeKV(es *ExportedService) error {
 		ops = append(ops, op)
 	}
 
-	_, _, _, err := t.client.KV().Txn(ops, nil)
+	_, _, _, err = t.client.KV().Txn(ops, nil)
 	return err
 }
 
@@ -132,4 +158,63 @@ func (t *ConsulTarget) asrFromExportedService(es *ExportedService) *capi.AgentSe
 			Interval: "10s",
 		},
 	}
+}
+
+// shouldUpdateKV checks if the hash of the ExportedService is the same as the
+// hash stored in Consul.  If they differ, KV data is updated.
+func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
+	key := fmt.Sprintf("%s/hash", t.metadataPrefix(es))
+	qo := capi.QueryOptions{RequireConsistent: true}
+
+	kvPair, _, err := t.client.KV().Get(key, &qo)
+	if err != nil {
+		return true, errors.Wrap(err, "Error getting KV hash")
+	}
+
+	if kvPair == nil {
+		return true, nil
+	}
+
+	hash, err := es.Hash()
+	if err != nil {
+		return true, errors.Wrap(err, "Error getting ExportedService Hash in shouldUpdateKV")
+	}
+
+	if string(kvPair.Value) == hash {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// returns true if the active AgentService in Consul is equivalent to the
+// AgentServiceRegistration passed in. Because there is no API for it, this
+// does not (and cannot) verify if the Consul Agent Service *Check* has changed,
+// but since it is generated from metadata that is present in the AgentService,
+// this should be fine.
+func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (bool, error) {
+	services, err := t.client.Agent().Services()
+	if err != nil {
+		return false, errors.Wrap(err, "Error getting agent services")
+	}
+
+	// Consul Service doesn't exist
+	service, found := services[asr.ID]
+	if !found {
+		return true, nil
+	}
+
+	sort.Strings(asr.Tags)
+	sort.Strings(service.Tags)
+
+	// verify that the AgentService and AgentServiceRegistration are the same
+	if asr.ID == service.ID &&
+		asr.Name == service.Service &&
+		reflect.DeepEqual(asr.Tags, service.Tags) &&
+		asr.Port == service.Port &&
+		asr.Address == service.Address {
+		return false, nil
+	}
+
+	return true, nil
 }

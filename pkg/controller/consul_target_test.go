@@ -183,3 +183,57 @@ func (s *ConsulTargetSuite) TestDelete() {
 	_, found = services["ns1-name1-http"]
 	s.False(found)
 }
+
+func (s *ConsulTargetSuite) TestShouldUpdateKV() {
+	es := &ExportedService{
+		ClusterId: ClusterId,
+		Namespace: "ns1",
+		Name:      "name1",
+		PortName:  "http",
+		Port:      32001}
+
+	ok, err := s.target.shouldUpdateKV(es)
+	s.NoError(err)
+	s.True(ok, "Should update KV before first create")
+
+	ok, err = s.target.Create(es)
+	s.NoError(err)
+	s.True(ok)
+
+	ok, err = s.target.shouldUpdateKV(es)
+	s.NoError(err)
+	s.False(ok, "Should not update KV if same")
+
+	es.Port += 1
+	ok, err = s.target.shouldUpdateKV(es)
+	s.NoError(err)
+	s.True(ok, "Should update KV after change")
+}
+
+func (s *ConsulTargetSuite) TestShouldUpdateService() {
+	es := &ExportedService{
+		ClusterId: ClusterId,
+		Namespace: "ns1",
+		Name:      "name1",
+		PortName:  "http",
+		Port:      32001}
+
+	asr := s.target.asrFromExportedService(es)
+	ok, err := s.target.shouldUpdateService(asr)
+	s.NoError(err)
+	s.True(ok, "Should update service before first create")
+
+	ok, err = s.target.Create(es)
+	s.NoError(err)
+	s.True(ok)
+
+	ok, err = s.target.shouldUpdateService(asr)
+	s.NoError(err)
+	s.False(ok, "Should not update service if AgentServiceRegistration same")
+
+	es.Port += 1
+	asr = s.target.asrFromExportedService(es)
+	ok, err = s.target.shouldUpdateService(asr)
+	s.NoError(err)
+	s.True(ok, "Should update Service after change")
+}

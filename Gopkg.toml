@@ -53,6 +53,10 @@
   name = "github.com/pkg/errors"
   version = "v0.8.0"
 
+[[constraint]]
+  name = "github.com/mitchellh/hashstructure"
+  revision = "2bca23e0e452137f789efbc8610126fd8b94f73b"
+
 [prune]
   go-tests = true
   unused-packages = true
