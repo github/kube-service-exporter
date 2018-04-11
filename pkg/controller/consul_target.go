@@ -1,12 +1,12 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"reflect"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -110,38 +110,18 @@ func (t *ConsulTarget) metadataPrefix(es *ExportedService) string {
 // Write out metadata to where it belongs in Consul using a transaction.  This
 // should only ever get called by the current leader
 func (t *ConsulTarget) writeKV(es *ExportedService) error {
-	hash, err := es.Hash()
+	esJson, err := json.Marshal(es)
 	if err != nil {
-		return errors.Wrap(err, "Error calling ExportedService.Hash()")
+		return errors.Wrap(err, "Error marshaling ExportedService JSON")
 	}
 
-	kvPairs := map[string]string{
-		"hash":                      hash,
-		"cluster_name":              es.ClusterId,
-		"proxy_protocol":            strconv.FormatBool(es.ProxyProtocol),
-		"backend_protocol":          es.BackendProtocol,
-		"health_check_path":         es.HealthCheckPath,
-		"health_check_port":         strconv.Itoa(int(es.HealthCheckPort)),
-		"dns_name":                  es.DNSName,
-		"load_balancer_class":       es.LoadBalancerClass,
-		"load_balancer_listen_port": strconv.Itoa(int(es.LoadBalancerListenPort)),
+	kvPair := capi.KVPair{
+		Key:   t.metadataPrefix(es),
+		Value: esJson,
 	}
 
-	ops := make([]*capi.KVTxnOp, 0, len(kvPairs))
+	_, err = t.client.KV().Put(&kvPair, nil)
 
-	// write out the cluster-level key explicitly so it can be enumerated with
-	// a consul-template ls operation
-	ops = append(ops, &capi.KVTxnOp{Verb: capi.KVSet, Key: t.metadataPrefix(es)})
-	for k, v := range kvPairs {
-		op := &capi.KVTxnOp{
-			Verb:  capi.KVSet,
-			Key:   fmt.Sprintf("%s/%s", t.metadataPrefix(es), k),
-			Value: []byte(v),
-		}
-		ops = append(ops, op)
-	}
-
-	_, _, _, err = t.client.KV().Txn(ops, nil)
 	return err
 }
 
@@ -163,7 +143,7 @@ func (t *ConsulTarget) asrFromExportedService(es *ExportedService) *capi.AgentSe
 // shouldUpdateKV checks if the hash of the ExportedService is the same as the
 // hash stored in Consul.  If they differ, KV data is updated.
 func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
-	key := fmt.Sprintf("%s/hash", t.metadataPrefix(es))
+	key := t.metadataPrefix(es)
 	qo := capi.QueryOptions{RequireConsistent: true}
 
 	kvPair, _, err := t.client.KV().Get(key, &qo)
@@ -175,12 +155,22 @@ func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
 		return true, nil
 	}
 
+	var meta map[string]interface{}
+	if err := json.Unmarshal(kvPair.Value, &meta); err != nil {
+		return true, errors.Wrap(err, "Error unmarshaling JSON from Consul")
+	}
+
+	consulHash, ok := meta["hash"]
+	if !ok {
+		return true, nil
+	}
+
 	hash, err := es.Hash()
 	if err != nil {
 		return true, errors.Wrap(err, "Error getting ExportedService Hash in shouldUpdateKV")
 	}
 
-	if string(kvPair.Value) == hash {
+	if consulHash == hash {
 		return false, nil
 	}
 
@@ -188,10 +178,7 @@ func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
 }
 
 // returns true if the active AgentService in Consul is equivalent to the
-// AgentServiceRegistration passed in. Because there is no API for it, this
-// does not (and cannot) verify if the Consul Agent Service *Check* has changed,
-// but since it is generated from metadata that is present in the AgentService,
-// this should be fine.
+// AgentServiceRegistration passed in.
 func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (bool, error) {
 	services, err := t.client.Agent().Services()
 	if err != nil {
@@ -207,7 +194,10 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 	sort.Strings(asr.Tags)
 	sort.Strings(service.Tags)
 
-	// verify that the AgentService and AgentServiceRegistration are the same
+	// verify that the AgentService and AgentServiceRegistration are the same.
+	// Because there is no API for it, this does not (and cannot) verify if the
+	// Consul Agent Service *Check* has changed, but since the Check is
+	// generated from metadata present in the AgentService, this should be fine.
 	if asr.ID == service.ID &&
 		asr.Name == service.Service &&
 		reflect.DeepEqual(asr.Tags, service.Tags) &&

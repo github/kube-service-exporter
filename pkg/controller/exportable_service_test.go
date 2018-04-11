@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -184,4 +185,22 @@ func TestHash(t *testing.T) {
 	hash3, err := es2.Hash()
 	assert.Nil(t, err)
 	assert.NotEqual(t, hash2, hash3, "different ExportedServices should have different hashes")
+}
+
+func TestJSON(t *testing.T) {
+	es, _ := NewExportedService(ServiceFixture(), "cluster", 0)
+	b, err := json.Marshal(es)
+	assert.NoError(t, err)
+	expected := `{ "health_check_path": "",
+					"health_check_port": 32123,
+					"proxy_protocol": false,
+					"load_balancer_listen_port": 0,
+					"hash": "cdc3e2e77a74ebc8",
+					"ClusterName": "cluster",
+					"port": 32123,
+					"dns_name": "",
+					"backend_protocol": "http",
+					"load_balancer_class": "" }`
+
+	assert.JSONEq(t, expected, string(b))
 }
