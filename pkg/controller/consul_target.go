@@ -178,10 +178,7 @@ func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
 }
 
 // returns true if the active AgentService in Consul is equivalent to the
-// AgentServiceRegistration passed in. Because there is no API for it, this
-// does not (and cannot) verify if the Consul Agent Service *Check* has changed,
-// but since it is generated from metadata that is present in the AgentService,
-// this should be fine.
+// AgentServiceRegistration passed in.
 func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (bool, error) {
 	services, err := t.client.Agent().Services()
 	if err != nil {
@@ -197,7 +194,10 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 	sort.Strings(asr.Tags)
 	sort.Strings(service.Tags)
 
-	// verify that the AgentService and AgentServiceRegistration are the same
+	// verify that the AgentService and AgentServiceRegistration are the same.
+	// Because there is no API for it, this does not (and cannot) verify if the
+	// Consul Agent Service *Check* has changed, but since the Check is
+	// generated from metadata present in the AgentService, this should be fine.
 	if asr.ID == service.ID &&
 		asr.Name == service.Service &&
 		reflect.DeepEqual(asr.Tags, service.Tags) &&
