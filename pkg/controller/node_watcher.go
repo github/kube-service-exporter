@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -35,7 +36,7 @@ func NewNodeInformerConfig() (*NodeInformerConfig, error) {
 	lw := cache.NewListWatchFromClient(
 		cs.CoreV1().RESTClient(),
 		"nodes",
-		meta_v1.NamespaceAll,
+		"",
 		fields.Everything())
 
 	return &NodeInformerConfig{
@@ -94,6 +95,9 @@ func (nw *NodeWatcher) exportNodes() {
 	for _, node := range nodeList.Items {
 		// add some checks for matching node conditions here
 		nodes = append(nodes, node.Name)
+	}
+	if len(nodes) < 1 {
+		fmt.Println("Node nodes found")
 	}
 
 	if err := nw.target.WriteNodes(nodes); err != nil {
