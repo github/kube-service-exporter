@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"k8s.io/api/core/v1"
 
 	"github.com/github/kube-service-exporter/pkg/leader"
 	capi "github.com/hashicorp/consul/api"
@@ -23,6 +24,11 @@ type ConsulTarget struct {
 	kvPrefix  string
 	wg        sync.WaitGroup
 	clusterId string
+}
+
+type ExportedNode struct {
+	Name    string
+	Address string
 }
 
 var _ ExportTarget = (*ConsulTarget)(nil)
@@ -209,12 +215,28 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 	return true, nil
 }
 
-func (t *ConsulTarget) WriteNodes(nodes []string) error {
+func (t *ConsulTarget) WriteNodes(nodeList *v1.NodeList) error {
+	var nodes []ExportedNode
+
 	if !t.elector.IsLeader() {
 		// do nothing
 		return nil
 	}
-	sort.Strings(nodes)
+
+	for _, k8sNode := range nodeList.Items {
+		for _, addr := range k8sNode.Status.Addresses {
+			if addr.Type != "InternalIP" {
+				continue
+			}
+
+			node := ExportedNode{
+				Name:    k8sNode.Name,
+				Address: addr.Address,
+			}
+			nodes = append(nodes, node)
+		}
+	}
+
 	nodeJson, err := json.Marshal(nodes)
 	if err != nil {
 		return errors.Wrap(err, "Error marshaling node JSON")

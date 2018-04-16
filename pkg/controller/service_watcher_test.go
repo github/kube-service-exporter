@@ -72,7 +72,7 @@ func (t *fakeTarget) Delete(es *ExportedService) (bool, error) {
 	return false, nil
 }
 
-func (t *fakeTarget) WriteNodes(nodes []string) error {
+func (t *fakeTarget) WriteNodes(nodes *v1.NodeList) error {
 	return nil
 }
 

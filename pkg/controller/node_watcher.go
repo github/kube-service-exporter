@@ -81,8 +81,6 @@ func (nw *NodeWatcher) Stop() {
 }
 
 func (nw *NodeWatcher) exportNodes(target ExportTarget) {
-	var nodes []string
-
 	options := meta_v1.ListOptions{
 		LabelSelector: "kubernetes.github.com/role=node",
 	}
@@ -91,15 +89,11 @@ func (nw *NodeWatcher) exportNodes(target ExportTarget) {
 		log.Println("Error getting node list: ", err)
 	}
 
-	for _, node := range nodeList.Items {
-		// add some checks for matching node conditions here
-		nodes = append(nodes, node.Name)
-	}
-	if len(nodes) < 1 {
-		fmt.Println("Node nodes found")
+	if len(nodeList.Items) < 1 {
+		fmt.Println("No nodes found")
 	}
 
-	if err := target.WriteNodes(nodes); err != nil {
+	if err := target.WriteNodes(nodeList); err != nil {
 		log.Println("Error writing nodes to target: ", err)
 	}
 }
