@@ -227,8 +227,8 @@ func (t *ConsulTarget) WriteNodes(nodes []string) error {
 		return errors.Wrapf(err, "Error getting %s key", key)
 	}
 
-	// nothing changed
-	if reflect.DeepEqual(current.Value, nodeJson) {
+	if current != nil && reflect.DeepEqual(current.Value, nodeJson) {
+		// nothing changed
 		return nil
 	}
 

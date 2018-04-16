@@ -18,7 +18,6 @@ type NodeWatcher struct {
 	stopC      chan struct{}
 	wg         sync.WaitGroup
 	clientset  kubernetes.Interface
-	target     ExportTarget
 }
 
 type NodeInformerConfig struct {
@@ -59,13 +58,13 @@ func NewNodeWatcher(config *NodeInformerConfig, namespaces []string, target Expo
 		config.ResyncPeriod,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				nw.exportNodes()
+				nw.exportNodes(target)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				nw.exportNodes()
+				nw.exportNodes(target)
 			},
 			DeleteFunc: func(obj interface{}) {
-				nw.exportNodes()
+				nw.exportNodes(target)
 			}})
 
 	return nw
@@ -81,7 +80,7 @@ func (nw *NodeWatcher) Stop() {
 	nw.wg.Wait()
 }
 
-func (nw *NodeWatcher) exportNodes() {
+func (nw *NodeWatcher) exportNodes(target ExportTarget) {
 	var nodes []string
 
 	options := meta_v1.ListOptions{
@@ -100,7 +99,7 @@ func (nw *NodeWatcher) exportNodes() {
 		fmt.Println("Node nodes found")
 	}
 
-	if err := nw.target.WriteNodes(nodes); err != nil {
+	if err := target.WriteNodes(nodes); err != nil {
 		log.Println("Error writing nodes to target: ", err)
 	}
 }
