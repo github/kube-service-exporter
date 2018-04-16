@@ -208,3 +208,40 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 
 	return true, nil
 }
+
+func (t *ConsulTarget) WriteNodes(nodes []string) error {
+	if !t.elector.IsLeader() {
+		// do nothing
+		return nil
+	}
+	sort.Strings(nodes)
+	nodeJson, err := json.Marshal(nodes)
+	if err != nil {
+		return errors.Wrap(err, "Error marshaling node JSON")
+	}
+
+	key := fmt.Sprintf("%s/nodes/%s", t.kvPrefix, t.clusterId)
+
+	current, _, err := t.client.KV().Get(key, &capi.QueryOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "Error getting %s key", key)
+	}
+
+	// nothing changed
+	if reflect.DeepEqual(current.Value, nodeJson) {
+		return nil
+	}
+
+	kv := capi.KVPair{
+		Key:   key,
+		Value: nodeJson,
+	}
+
+	_, err = t.client.KV().Put(&kv, nil)
+	if err != nil {
+		return errors.Wrapf(err, "Error writing %s key", key)
+	}
+
+	log.Println("[LEADER] Writing Node list to ", key)
+	return nil
+}

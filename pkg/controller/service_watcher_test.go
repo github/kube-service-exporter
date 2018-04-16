@@ -72,6 +72,10 @@ func (t *fakeTarget) Delete(es *ExportedService) (bool, error) {
 	return false, nil
 }
 
+func (t *fakeTarget) WriteNodes(nodes []string) error {
+	return nil
+}
+
 func (t *fakeTarget) find(es *ExportedService) (int, bool) {
 	for i, val := range t.Store {
 		if val.Id() == es.Id() {

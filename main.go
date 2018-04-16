@@ -43,6 +43,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	nodeIC, err := controller.NewNodeInformerConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Get the IP for the local consul agent since we need it in a few places
 	consulIPs, err := net.LookupIP(consulHost)
 	if err != nil {
@@ -71,6 +76,9 @@ func main() {
 	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
 	go sw.Run()
 
+	nw := controller.NewNodeWatcher(nodeIC, namespaces, target)
+	go nw.Run()
+
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
 	<-sigC
@@ -82,6 +90,9 @@ func main() {
 		log.Println("Stopped Consul leadership elector.")
 		sw.Stop()
 		log.Println("Stopped Service Watcher.")
+		nw.Stop()
+		log.Println("Stopped Node Watcher.")
+
 	}()
 
 	// make sure stops don't take too long
