@@ -28,6 +28,7 @@ func main() {
 	consulHost := viper.GetString("CONSUL_HOST")
 	consulPort := viper.GetInt("CONSUL_PORT")
 	podName := viper.GetString("POD_NAME")
+	nodeSelector := viper.GetString("NODE_SELECTOR")
 
 	if !viper.IsSet("CLUSTER_ID") {
 		log.Fatalf("Please set the KSE_CLUSTER_ID environment variable to a unique cluster Id")
@@ -76,7 +77,7 @@ func main() {
 	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
 	go sw.Run()
 
-	nw := controller.NewNodeWatcher(nodeIC, namespaces, target)
+	nw := controller.NewNodeWatcher(nodeIC, namespaces, target, nodeSelector)
 	go nw.Run()
 
 	sigC := make(chan os.Signal, 1)

@@ -45,7 +45,7 @@ func NewNodeInformerConfig() (*NodeInformerConfig, error) {
 	}, nil
 }
 
-func NewNodeWatcher(config *NodeInformerConfig, namespaces []string, target ExportTarget) *NodeWatcher {
+func NewNodeWatcher(config *NodeInformerConfig, namespaces []string, target ExportTarget, nodeSelector string) *NodeWatcher {
 	nw := &NodeWatcher{
 		stopC:     make(chan struct{}),
 		wg:        sync.WaitGroup{},
@@ -58,13 +58,13 @@ func NewNodeWatcher(config *NodeInformerConfig, namespaces []string, target Expo
 		config.ResyncPeriod,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				nw.exportNodes(target)
+				nw.exportNodes(target, nodeSelector)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				nw.exportNodes(target)
+				nw.exportNodes(target, nodeSelector)
 			},
 			DeleteFunc: func(obj interface{}) {
-				nw.exportNodes(target)
+				nw.exportNodes(target, nodeSelector)
 			}})
 
 	return nw
@@ -80,20 +80,47 @@ func (nw *NodeWatcher) Stop() {
 	nw.wg.Wait()
 }
 
-func (nw *NodeWatcher) exportNodes(target ExportTarget) {
-	options := meta_v1.ListOptions{
-		LabelSelector: "kubernetes.github.com/role=node",
+func (nw *NodeWatcher) exportNodes(target ExportTarget, selector string) {
+	var nodes []v1.Node
+	var options meta_v1.ListOptions
+
+	if len(selector) > 0 {
+		options.LabelSelector = selector
 	}
+
 	nodeList, err := nw.clientset.CoreV1().Nodes().List(options)
 	if err != nil {
 		log.Println("Error getting node list: ", err)
 	}
 
-	if len(nodeList.Items) < 1 {
+	for _, node := range nodeList.Items {
+		if nodeReady(node) {
+			nodes = append(nodes, node)
+		}
+	}
+
+	if len(nodes) < 1 {
 		fmt.Println("No nodes found")
 	}
 
-	if err := target.WriteNodes(nodeList); err != nil {
+	if err := target.WriteNodes(nodes); err != nil {
 		log.Println("Error writing nodes to target: ", err)
 	}
+}
+
+func nodeReady(node v1.Node) bool {
+	if node.Spec.Unschedulable {
+		return false
+	}
+
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == v1.NodeReady {
+			if cond.Status == v1.ConditionTrue {
+				return true
+			}
+			break
+		}
+	}
+
+	return false
 }

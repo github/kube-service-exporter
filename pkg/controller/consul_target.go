@@ -215,29 +215,29 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 	return true, nil
 }
 
-func (t *ConsulTarget) WriteNodes(nodeList *v1.NodeList) error {
-	var nodes []ExportedNode
+func (t *ConsulTarget) WriteNodes(nodes []v1.Node) error {
+	var exportedNodes []ExportedNode
 
 	if !t.elector.IsLeader() {
 		// do nothing
 		return nil
 	}
 
-	for _, k8sNode := range nodeList.Items {
+	for _, k8sNode := range nodes {
 		for _, addr := range k8sNode.Status.Addresses {
 			if addr.Type != "InternalIP" {
 				continue
 			}
 
-			node := ExportedNode{
+			exportedNode := ExportedNode{
 				Name:    k8sNode.Name,
 				Address: addr.Address,
 			}
-			nodes = append(nodes, node)
+			exportedNodes = append(exportedNodes, exportedNode)
 		}
 	}
 
-	nodeJson, err := json.Marshal(nodes)
+	nodeJson, err := json.Marshal(exportedNodes)
 	if err != nil {
 		return errors.Wrap(err, "Error marshaling node JSON")
 	}
