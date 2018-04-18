@@ -11,6 +11,7 @@ import (
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"k8s.io/api/core/v1"
 )
 
 const (
@@ -230,4 +231,21 @@ func (s *ConsulTargetSuite) TestShouldUpdateService() {
 	ok, err = s.target.shouldUpdateService(asr)
 	s.NoError(err)
 	s.True(ok, "Should update Service after change")
+}
+
+func (s *ConsulTargetSuite) TestShouldWriteNodes() {
+	var exportedNodes []ExportedNode
+	s.target.WriteNodes([]v1.Node{testingNode()})
+
+	key := fmt.Sprintf("%s/nodes/%s", KvPrefix, ClusterId)
+	pair, meta, err := s.consulServer.Client.KV().Get(key, nil)
+	require.NoError(s.T(), err)
+	s.NotNilf(pair, "%s should exist")
+	require.NoError(s.T(), json.Unmarshal(pair.Value, &exportedNodes))
+	s.Len(exportedNodes, 1, "should write 1 node")
+	lastIndex := meta.LastIndex
+
+	s.target.WriteNodes([]v1.Node{testingNode()})
+	_, meta, _ = s.consulServer.Client.KV().Get(key, nil)
+	s.Equal(lastIndex, meta.LastIndex, "Should not write duplicate data")
 }

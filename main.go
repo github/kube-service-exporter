@@ -77,7 +77,7 @@ func main() {
 	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
 	go sw.Run()
 
-	nw := controller.NewNodeWatcher(nodeIC, namespaces, target, nodeSelector)
+	nw := controller.NewNodeWatcher(nodeIC, target, nodeSelector)
 	go nw.Run()
 
 	sigC := make(chan os.Signal, 1)

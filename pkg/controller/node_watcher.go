@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -45,7 +44,7 @@ func NewNodeInformerConfig() (*NodeInformerConfig, error) {
 	}, nil
 }
 
-func NewNodeWatcher(config *NodeInformerConfig, namespaces []string, target ExportTarget, nodeSelector string) *NodeWatcher {
+func NewNodeWatcher(config *NodeInformerConfig, target ExportTarget, nodeSelector string) *NodeWatcher {
 	nw := &NodeWatcher{
 		stopC:     make(chan struct{}),
 		wg:        sync.WaitGroup{},
@@ -100,7 +99,7 @@ func (nw *NodeWatcher) exportNodes(target ExportTarget, selector string) {
 	}
 
 	if len(nodes) < 1 {
-		fmt.Println("No nodes found")
+		log.Println("No nodes found")
 	}
 
 	if err := target.WriteNodes(nodes); err != nil {

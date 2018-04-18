@@ -35,13 +35,14 @@ func chanRecvWithTimeout(t *testing.T, c chan string) string {
 // can detect that the method was called.
 type fakeTarget struct {
 	Store  []*ExportedService
+	Nodes  map[string]ExportedNode
 	EventC chan string
 }
 
 func NewFakeTarget() *fakeTarget {
 	return &fakeTarget{
 		Store:  make([]*ExportedService, 0),
-		EventC: make(chan string)}
+		EventC: make(chan string, 1)}
 }
 
 func (t *fakeTarget) Create(es *ExportedService) (bool, error) {
@@ -73,6 +74,24 @@ func (t *fakeTarget) Delete(es *ExportedService) (bool, error) {
 }
 
 func (t *fakeTarget) WriteNodes(nodes []v1.Node) error {
+	exportedNodes := make(map[string]ExportedNode)
+
+	for _, k8sNode := range nodes {
+		for _, addr := range k8sNode.Status.Addresses {
+			if addr.Type != "InternalIP" {
+				continue
+			}
+
+			exportedNode := ExportedNode{
+				Name:    k8sNode.Name,
+				Address: addr.Address,
+			}
+			exportedNodes[k8sNode.Name] = exportedNode
+		}
+	}
+
+	t.Nodes = exportedNodes
+	t.EventC <- "write_nodes"
 	return nil
 }
 

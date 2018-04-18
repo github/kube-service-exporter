@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -225,7 +226,7 @@ func (t *ConsulTarget) WriteNodes(nodes []v1.Node) error {
 
 	for _, k8sNode := range nodes {
 		for _, addr := range k8sNode.Status.Addresses {
-			if addr.Type != "InternalIP" {
+			if addr.Type != v1.NodeInternalIP {
 				continue
 			}
 
@@ -249,7 +250,7 @@ func (t *ConsulTarget) WriteNodes(nodes []v1.Node) error {
 		return errors.Wrapf(err, "Error getting %s key", key)
 	}
 
-	if current != nil && reflect.DeepEqual(current.Value, nodeJson) {
+	if current != nil && bytes.Equal(current.Value, nodeJson) {
 		// nothing changed
 		return nil
 	}
@@ -259,8 +260,7 @@ func (t *ConsulTarget) WriteNodes(nodes []v1.Node) error {
 		Value: nodeJson,
 	}
 
-	_, err = t.client.KV().Put(&kv, nil)
-	if err != nil {
+	if _, err := t.client.KV().Put(&kv, nil); err != nil {
 		return errors.Wrapf(err, "Error writing %s key", key)
 	}
 
