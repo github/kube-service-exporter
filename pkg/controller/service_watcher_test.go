@@ -42,7 +42,7 @@ type fakeTarget struct {
 func NewFakeTarget() *fakeTarget {
 	return &fakeTarget{
 		Store:  make([]*ExportedService, 0),
-		EventC: make(chan string, 1)}
+		EventC: make(chan string)}
 }
 
 func (t *fakeTarget) Create(es *ExportedService) (bool, error) {
@@ -73,7 +73,7 @@ func (t *fakeTarget) Delete(es *ExportedService) (bool, error) {
 	return false, nil
 }
 
-func (t *fakeTarget) WriteNodes(nodes []v1.Node) error {
+func (t *fakeTarget) WriteNodes(nodes []*v1.Node) error {
 	exportedNodes := make(map[string]ExportedNode)
 
 	for _, k8sNode := range nodes {

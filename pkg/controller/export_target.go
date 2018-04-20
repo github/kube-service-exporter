@@ -6,5 +6,5 @@ type ExportTarget interface {
 	Create(*ExportedService) (bool, error)
 	Update(*ExportedService) (bool, error)
 	Delete(*ExportedService) (bool, error)
-	WriteNodes([]v1.Node) error
+	WriteNodes([]*v1.Node) error
 }

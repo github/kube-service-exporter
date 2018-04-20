@@ -10,7 +10,6 @@ import (
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	fcache "k8s.io/client-go/tools/cache/testing"
 )
 
 type NodeWatcherSuite struct {
@@ -19,7 +18,6 @@ type NodeWatcherSuite struct {
 	serviceFixture *v1.Service
 	target         *fakeTarget
 	ic             *NodeInformerConfig
-	source         *fcache.FakeControllerSource
 }
 
 func testingNode() v1.Node {
@@ -53,12 +51,9 @@ func testingNode() v1.Node {
 func (s *NodeWatcherSuite) SetupTest() {
 	var err error
 
-	// set up a fake ListerWatcher and ClientSet
-	s.source = fcache.NewFakeControllerSource()
 	s.ic = &NodeInformerConfig{
-		ClientSet:     fake.NewSimpleClientset(),
-		ListerWatcher: s.source,
-		ResyncPeriod:  time.Duration(0),
+		ClientSet:    fake.NewSimpleClientset(),
+		ResyncPeriod: time.Duration(0),
 	}
 
 	require.NoError(s.T(), err)
@@ -71,17 +66,6 @@ func (s *NodeWatcherSuite) SetupTest() {
 
 func (s *NodeWatcherSuite) TearDownTest() {
 	s.nw.Stop()
-}
-
-func (s *NodeWatcherSuite) addNode(node *v1.Node) {
-	s.T().Helper()
-	// need to add the object to both the clientset and the source since the
-	// fake objects don't tie the two together and we do a Nodes().List() inside
-	// the watch funcs.
-	_, err := s.ic.ClientSet.CoreV1().Nodes().Create(node)
-	require.NoError(s.T(), err)
-	s.source.Add(node)
-
 }
 
 func (s *NodeWatcherSuite) TestAddNodes() {
@@ -107,15 +91,70 @@ func (s *NodeWatcherSuite) TestAddNodes() {
 
 	for i, test := range tests {
 		test.node.Name = fmt.Sprintf("%d.example.net", i)
-		s.addNode(&test.node)
+		_, err := s.ic.ClientSet.CoreV1().Nodes().Create(&test.node)
+		require.NoError(s.T(), err)
 
-		val := chanRecvWithTimeout(s.T(), s.target.EventC)
-		s.Equal("write_nodes", val)
 		if test.add {
+			val := chanRecvWithTimeout(s.T(), s.target.EventC)
+			s.Equal("write_nodes", val)
 			s.Contains(s.target.Nodes, test.node.Name)
 		} else {
 			s.NotContains(s.target.Nodes, test.node.Name)
 		}
+	}
+}
+
+func (s *NodeWatcherSuite) TestUpdateNodes() {
+	node := testingNode()
+	_, err := s.ic.ClientSet.CoreV1().Nodes().Create(&node)
+	require.NoError(s.T(), err)
+
+	val := chanRecvWithTimeout(s.T(), s.target.EventC)
+	s.Equal("write_nodes", val)
+	s.Contains(s.target.Nodes, node.Name)
+
+	_, err = s.ic.ClientSet.CoreV1().Nodes().Update(&node)
+	require.NoError(s.T(), err)
+	s.Equal("write_nodes", val)
+	s.Contains(s.target.Nodes, node.Name)
+}
+
+// The Delete here doesn't appear to be triggering the Watch, so this is commented
+// out for now.
+func (s *NodeWatcherSuite) xTestDeleteNodes() {
+	node := testingNode()
+	_, err := s.ic.ClientSet.CoreV1().Nodes().Create(&node)
+	require.NoError(s.T(), err)
+
+	val := chanRecvWithTimeout(s.T(), s.target.EventC)
+	s.Equal("write_nodes", val)
+	s.Contains(s.target.Nodes, node.Name)
+
+	err = s.ic.ClientSet.CoreV1().Nodes().Delete(node.Name, &meta_v1.DeleteOptions{})
+	require.NoError(s.T(), err)
+
+	val = chanRecvWithTimeout(s.T(), s.target.EventC)
+	s.Equal("write_nodes", val)
+	s.NotContains(s.target.Nodes, node.Name)
+	fmt.Println(s.target.Nodes)
+}
+
+func (s *NodeWatcherSuite) TestNodeReady() {
+	readyNode := testingNode()
+	s.True(nodeReady(&readyNode))
+
+	notReadyNodes := []v1.Node{
+		testingNode(),
+		testingNode(),
+	}
+
+	notReadyNodes[0].Spec.Unschedulable = true
+	notReadyNodes[1].Status.Conditions = []v1.NodeCondition{
+		v1.NodeCondition{Type: v1.NodeReady, Status: v1.ConditionFalse},
+	}
+
+	for _, node := range notReadyNodes {
+		s.False(nodeReady(&node))
 	}
 }
 

@@ -216,7 +216,7 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 	return true, nil
 }
 
-func (t *ConsulTarget) WriteNodes(nodes []v1.Node) error {
+func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
 	var exportedNodes []ExportedNode
 
 	if !t.elector.IsLeader() {

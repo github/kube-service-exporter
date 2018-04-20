@@ -6,23 +6,23 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/informers"
+	informers_v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
 
 type NodeWatcher struct {
-	controller cache.Controller
-	stopC      chan struct{}
-	wg         sync.WaitGroup
-	clientset  kubernetes.Interface
+	informer  informers_v1.NodeInformer
+	stopC     chan struct{}
+	wg        sync.WaitGroup
+	clientset kubernetes.Interface
 }
 
 type NodeInformerConfig struct {
-	ClientSet     kubernetes.Interface
-	ListerWatcher cache.ListerWatcher
-	ResyncPeriod  time.Duration
+	ClientSet    kubernetes.Interface
+	ResyncPeriod time.Duration
 }
 
 func NewNodeInformerConfig() (*NodeInformerConfig, error) {
@@ -31,16 +31,9 @@ func NewNodeInformerConfig() (*NodeInformerConfig, error) {
 		return nil, err
 	}
 
-	lw := cache.NewListWatchFromClient(
-		cs.CoreV1().RESTClient(),
-		"nodes",
-		"",
-		fields.Everything())
-
 	return &NodeInformerConfig{
-		ClientSet:     cs,
-		ListerWatcher: lw,
-		ResyncPeriod:  15 * time.Minute,
+		ClientSet:    cs,
+		ResyncPeriod: 15 * time.Minute,
 	}, nil
 }
 
@@ -51,10 +44,9 @@ func NewNodeWatcher(config *NodeInformerConfig, target ExportTarget, nodeSelecto
 		clientset: config.ClientSet,
 	}
 
-	_, nw.controller = cache.NewInformer(
-		config.ListerWatcher,
-		&v1.Node{},
-		config.ResyncPeriod,
+	sharedInformers := informers.NewSharedInformerFactory(config.ClientSet, config.ResyncPeriod)
+	nw.informer = sharedInformers.Core().V1().Nodes()
+	nw.informer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				nw.exportNodes(target, nodeSelector)
@@ -70,7 +62,7 @@ func NewNodeWatcher(config *NodeInformerConfig, target ExportTarget, nodeSelecto
 }
 
 func (nw *NodeWatcher) Run() {
-	nw.controller.Run(nw.stopC)
+	nw.informer.Informer().Run(nw.stopC)
 }
 
 func (nw *NodeWatcher) Stop() {
@@ -80,21 +72,21 @@ func (nw *NodeWatcher) Stop() {
 }
 
 func (nw *NodeWatcher) exportNodes(target ExportTarget, selector string) {
-	var nodes []v1.Node
-	var options meta_v1.ListOptions
+	var readyNodes []*v1.Node
 
-	if len(selector) > 0 {
-		options.LabelSelector = selector
+	labelSelector, err := labels.Parse(selector)
+	if err != nil {
+		log.Println("Error parsing label selector: ", err)
 	}
 
-	nodeList, err := nw.clientset.CoreV1().Nodes().List(options)
+	nodes, err := nw.informer.Lister().List(labelSelector)
 	if err != nil {
 		log.Println("Error getting node list: ", err)
 	}
 
-	for _, node := range nodeList.Items {
+	for _, node := range nodes {
 		if nodeReady(node) {
-			nodes = append(nodes, node)
+			readyNodes = append(readyNodes, node)
 		}
 	}
 
@@ -107,7 +99,7 @@ func (nw *NodeWatcher) exportNodes(target ExportTarget, selector string) {
 	}
 }
 
-func nodeReady(node v1.Node) bool {
+func nodeReady(node *v1.Node) bool {
 	if node.Spec.Unschedulable {
 		return false
 	}

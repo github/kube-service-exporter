@@ -235,7 +235,8 @@ func (s *ConsulTargetSuite) TestShouldUpdateService() {
 
 func (s *ConsulTargetSuite) TestShouldWriteNodes() {
 	var exportedNodes []ExportedNode
-	s.target.WriteNodes([]v1.Node{testingNode()})
+	node := testingNode()
+	s.target.WriteNodes([]*v1.Node{&node})
 
 	key := fmt.Sprintf("%s/nodes/%s", KvPrefix, ClusterId)
 	pair, meta, err := s.consulServer.Client.KV().Get(key, nil)
@@ -245,7 +246,7 @@ func (s *ConsulTargetSuite) TestShouldWriteNodes() {
 	s.Len(exportedNodes, 1, "should write 1 node")
 	lastIndex := meta.LastIndex
 
-	s.target.WriteNodes([]v1.Node{testingNode()})
+	s.target.WriteNodes([]*v1.Node{&node})
 	_, meta, _ = s.consulServer.Client.KV().Get(key, nil)
 	s.Equal(lastIndex, meta.LastIndex, "Should not write duplicate data")
 }
