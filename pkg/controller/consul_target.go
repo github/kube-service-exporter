@@ -32,6 +32,9 @@ type ExportedNode struct {
 	Address string
 }
 
+type exportedNodeList []ExportedNode
+
+
 var _ ExportTarget = (*ConsulTarget)(nil)
 
 func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string, elector leader.LeaderElector) (*ConsulTarget, error) {
@@ -217,7 +220,7 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 }
 
 func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
-	var exportedNodes []ExportedNode
+	var exportedNodes exportedNodeList
 
 	if !t.elector.IsLeader() {
 		// do nothing
@@ -237,6 +240,8 @@ func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
 			exportedNodes = append(exportedNodes, exportedNode)
 		}
 	}
+
+	sort.Sort(exportedNodes)
 
 	nodeJson, err := json.Marshal(exportedNodes)
 	if err != nil {
@@ -267,3 +272,16 @@ func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
 	log.Println("[LEADER] Writing Node list to ", key)
 	return nil
 }
+
+func (esl exportedNodeList) Len() int {
+	return len(esl)
+}
+
+func (esl exportedNodeList) Swap(i, j int) {
+	esl[i], esl[j] = esl[j], esl[i]
+}
+
+func (esl exportedNodeList) Less(i, j int) bool {
+	return esl[i].Name < esl[j].Name
+}
+
