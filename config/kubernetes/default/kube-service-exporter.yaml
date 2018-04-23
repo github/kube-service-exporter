@@ -34,3 +34,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: KSE_NODE_SELECTOR
+          value: kubernetes.github.com/role=node
+

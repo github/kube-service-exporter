@@ -141,7 +141,7 @@ func (sw *ServiceWatcher) addService(service *v1.Service, target ExportTarget) {
 	exportedServices, _ := NewExportedServicesFromKubeService(service, sw.clusterId)
 
 	for _, es := range exportedServices {
-		log.Printf("Add service %+v", es)
+		log.Printf("Add service %s", es.Id())
 		_, err := target.Create(es)
 		if err != nil {
 			log.Printf("Error adding %+v", es)
@@ -164,7 +164,7 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 	newExportedServices, _ := NewExportedServicesFromKubeService(newService, sw.clusterId)
 	for _, es := range newExportedServices {
 		newIds[es.Id()] = true
-		log.Printf("Update service %+v", es)
+		log.Printf("Update service %s", es.Id())
 		_, err := target.Update(es)
 		if err != nil {
 			log.Printf("Error updating %+v", es)
@@ -189,7 +189,7 @@ func (sw *ServiceWatcher) deleteService(service *v1.Service, target ExportTarget
 
 	exportedServices, _ := NewExportedServicesFromKubeService(service, sw.clusterId)
 	for _, es := range exportedServices {
-		log.Printf("Delete service %+v", es)
+		log.Printf("Delete service %s", es.Id())
 		_, err := target.Delete(es)
 		if err != nil {
 			log.Printf("Error deleting %+v", es)

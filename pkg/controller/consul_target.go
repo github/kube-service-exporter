@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"k8s.io/api/core/v1"
 
 	"github.com/github/kube-service-exporter/pkg/leader"
 	capi "github.com/hashicorp/consul/api"
@@ -24,6 +26,14 @@ type ConsulTarget struct {
 	wg        sync.WaitGroup
 	clusterId string
 }
+
+type ExportedNode struct {
+	Name    string
+	Address string
+}
+
+type exportedNodeList []ExportedNode
+
 
 var _ ExportTarget = (*ConsulTarget)(nil)
 
@@ -208,3 +218,70 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 
 	return true, nil
 }
+
+func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
+	var exportedNodes exportedNodeList
+
+	if !t.elector.IsLeader() {
+		// do nothing
+		return nil
+	}
+
+	for _, k8sNode := range nodes {
+		for _, addr := range k8sNode.Status.Addresses {
+			if addr.Type != v1.NodeInternalIP {
+				continue
+			}
+
+			exportedNode := ExportedNode{
+				Name:    k8sNode.Name,
+				Address: addr.Address,
+			}
+			exportedNodes = append(exportedNodes, exportedNode)
+		}
+	}
+
+	sort.Sort(exportedNodes)
+
+	nodeJson, err := json.Marshal(exportedNodes)
+	if err != nil {
+		return errors.Wrap(err, "Error marshaling node JSON")
+	}
+
+	key := fmt.Sprintf("%s/nodes/%s", t.kvPrefix, t.clusterId)
+
+	current, _, err := t.client.KV().Get(key, &capi.QueryOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "Error getting %s key", key)
+	}
+
+	if current != nil && bytes.Equal(current.Value, nodeJson) {
+		// nothing changed
+		return nil
+	}
+
+	kv := capi.KVPair{
+		Key:   key,
+		Value: nodeJson,
+	}
+
+	if _, err := t.client.KV().Put(&kv, nil); err != nil {
+		return errors.Wrapf(err, "Error writing %s key", key)
+	}
+
+	log.Println("[LEADER] Writing Node list to ", key)
+	return nil
+}
+
+func (esl exportedNodeList) Len() int {
+	return len(esl)
+}
+
+func (esl exportedNodeList) Swap(i, j int) {
+	esl[i], esl[j] = esl[j], esl[i]
+}
+
+func (esl exportedNodeList) Less(i, j int) bool {
+	return esl[i].Name < esl[j].Name
+}
+
