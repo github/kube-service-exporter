@@ -4,7 +4,7 @@ metadata:
   name: kube-service-exporter
   namespace: kube-system
   labels:
-    k8s-app: kube-system
+    k8s-app: kube-service-exporter
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -36,4 +36,9 @@ spec:
               fieldPath: metadata.name
         - name: KSE_NODE_SELECTOR
           value: kubernetes.github.com/role=node
-
+        - name: KSE_DOGSTATSD_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KSE_DOGSTATSD_PORT
+          value: "28125"
