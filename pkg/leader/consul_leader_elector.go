@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/github/kube-service-exporter/pkg/stats"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
@@ -142,8 +143,14 @@ func (le *ConsulLeaderElector) Stop() {
 func (le *ConsulLeaderElector) setIsLeader(val bool) {
 	le.mutex.Lock()
 	defer le.mutex.Unlock()
+	tags := []string{"client_id:" + le.clientId}
 
 	le.isLeader = val
+	if val {
+		stats.Client().Incr("consul.leadership.elected", tags, 1)
+	} else {
+		stats.Client().Incr("consul.leadership.relinquished", tags, 1)
+	}
 }
 
 func (le *ConsulLeaderElector) leaderKey() string {
