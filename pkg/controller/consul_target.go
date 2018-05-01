@@ -106,17 +106,26 @@ func (t *ConsulTarget) Update(es *ExportedService) (bool, error) {
 }
 
 func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
-	tags := []string{"kv:metadata", "method:delete"}
+	var err error
+	tags := []string{"method:delete"}
 
-	if err := t.client.Agent().ServiceDeregister(es.Id()); err != nil {
+	stats.WithTiming("consul.service.time", tags, func() {
+		err = t.client.Agent().ServiceDeregister(es.Id())
+	})
+	stats.IncrSuccessOrFail(err, "consul.service", tags)
+	if err != nil {
 		return false, err
 	}
 
 	if t.elector.IsLeader() {
 		log.Printf("[LEADER] Deleting KV metadata for %s", es.Id())
-		stats.WithTiming("consul.kv.time", tags, func() {
-			t.client.KV().DeleteTree(t.metadataPrefix(es), &capi.WriteOptions{})
+		stats.WithTiming("consul.kv.time", append(tags, "kv:metadata"), func() {
+			_, err = t.client.KV().DeleteTree(t.metadataPrefix(es), &capi.WriteOptions{})
 		})
+		stats.IncrSuccessOrFail(err, "consul.kv", append(tags, "kv:metadata"))
+		if err != nil {
+			return false, err
+		}
 	}
 
 	return true, nil
