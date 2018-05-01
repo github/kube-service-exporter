@@ -58,7 +58,6 @@ func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string, electo
 
 func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 	var err error
-	defer stats.IncrSuccessOrFail(err, "consul.service.create", nil)
 	asr := t.asrFromExportedService(es)
 
 	wait := 15 * time.Second
@@ -99,14 +98,13 @@ func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 
 func (t *ConsulTarget) Update(es *ExportedService) (bool, error) {
 	ok, err := t.Create(es)
-	defer stats.IncrSuccessOrFail(err, "consul.service.update", nil)
 
 	return ok, err
 }
 
 func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
 	var err error
-	defer stats.IncrSuccessOrFail(err, "consul.service.delete", nil)
+	tags := []string{"kv:metadata", "method:delete"}
 
 	err = t.client.Agent().ServiceDeregister(es.Id())
 	if err != nil {
@@ -115,7 +113,9 @@ func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
 
 	if t.elector.IsLeader() {
 		log.Printf("[LEADER] Deleting KV metadata for %s", es.Id())
-		t.client.KV().DeleteTree(t.metadataPrefix(es), &capi.WriteOptions{})
+		stats.WithTiming("consul.kv.time", tags, func() {
+			t.client.KV().DeleteTree(t.metadataPrefix(es), &capi.WriteOptions{})
+		})
 	}
 
 	return true, nil
@@ -129,7 +129,7 @@ func (t *ConsulTarget) metadataPrefix(es *ExportedService) string {
 // should only ever get called by the current leader
 func (t *ConsulTarget) writeKV(es *ExportedService) error {
 	var err error
-	tags := []string{"kv:metadata"}
+	tags := []string{"kv:metadata", "method:put"}
 	defer stats.IncrSuccessOrFail(err, "consul.kv.write", tags)
 
 	esJson, err := json.Marshal(es)
@@ -142,7 +142,7 @@ func (t *ConsulTarget) writeKV(es *ExportedService) error {
 		Value: esJson,
 	}
 
-	stats.WithTiming("consul.kv.write.time", tags, func() {
+	stats.WithTiming("consul.kv.time", tags, func() {
 		_, err = t.client.KV().Put(&kvPair, nil)
 	})
 
@@ -172,9 +172,9 @@ func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
 
 	key := t.metadataPrefix(es)
 	qo := capi.QueryOptions{RequireConsistent: true}
-	tags := []string{"kv:metadata"}
+	tags := []string{"kv:metadata", "method:get"}
 
-	stats.WithTiming("consul.kv.read.time", tags, func() {
+	stats.WithTiming("consul.kv.time", tags, func() {
 		kvPair, _, err = t.client.KV().Get(key, &qo)
 	})
 	if err != nil {
@@ -273,7 +273,7 @@ func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
 	key := fmt.Sprintf("%s/nodes/%s", t.kvPrefix, t.clusterId)
 
 	var current *capi.KVPair
-	stats.WithTiming("consul.kv.read.time", tags, func() {
+	stats.WithTiming("consul.kv.time", append(tags, "method:get"), func() {
 		current, _, err = t.client.KV().Get(key, &capi.QueryOptions{})
 	})
 	if err != nil {
@@ -290,7 +290,7 @@ func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
 		Value: nodeJson,
 	}
 
-	stats.WithTiming("consul.kv.write.time", tags, func() {
+	stats.WithTiming("consul.kv.time", append(tags, "method:put"), func() {
 		_, err = t.client.KV().Put(&kv, nil)
 	})
 
