@@ -14,8 +14,8 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 
+	"github.com/github/kube-service-exporter/pkg/consul"
 	"github.com/github/kube-service-exporter/pkg/leader"
-	"github.com/github/kube-service-exporter/pkg/stats"
 	capi "github.com/hashicorp/consul/api"
 )
 
@@ -26,6 +26,8 @@ type ConsulTarget struct {
 	kvPrefix  string
 	wg        sync.WaitGroup
 	clusterId string
+	kv        *consul.InstrumentedKV
+	agent     *consul.InstrumentedAgent
 }
 
 type ExportedNode struct {
@@ -53,7 +55,10 @@ func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string, electo
 		elector:   elector,
 		hostIP:    hostIP,
 		clusterId: clusterId,
-		kvPrefix:  kvPrefix}, nil
+		kvPrefix:  kvPrefix,
+		kv:        consul.NewInstrumentedKV(client),
+		agent:     consul.NewInstrumentedAgent(client),
+	}, nil
 }
 
 func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
@@ -71,13 +76,7 @@ func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 
 	if updateService {
 		log.Printf("Updating Consul Service %s due to registration change", asr.ID)
-		var err error
-		tags := []string{"method:put", "service:" + es.Id()}
-		stats.WithTiming("consul.service.time", tags, func() {
-			err = t.client.Agent().ServiceRegister(asr)
-		})
-		stats.IncrSuccessOrFail(err, "consul.service", tags)
-		if err != nil {
+		if err := t.agent.ServiceRegister(asr); err != nil {
 			return false, err
 		}
 	}
@@ -106,23 +105,13 @@ func (t *ConsulTarget) Update(es *ExportedService) (bool, error) {
 }
 
 func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
-	var err error
-	tags := []string{"method:delete"}
-
-	stats.WithTiming("consul.service.time", tags, func() {
-		err = t.client.Agent().ServiceDeregister(es.Id())
-	})
-	stats.IncrSuccessOrFail(err, "consul.service", tags)
-	if err != nil {
+	if err := t.agent.ServiceDeregister(es.Id()); err != nil {
 		return false, err
 	}
 
 	if t.elector.IsLeader() {
 		log.Printf("[LEADER] Deleting KV metadata for %s", es.Id())
-		stats.WithTiming("consul.kv.time", append(tags, "kv:metadata"), func() {
-			_, err = t.client.KV().DeleteTree(t.metadataPrefix(es), &capi.WriteOptions{})
-		})
-		stats.IncrSuccessOrFail(err, "consul.kv", append(tags, "kv:metadata"))
+		_, err := t.kv.DeleteTree(t.metadataPrefix(es), &capi.WriteOptions{}, []string{"kv:metadata"})
 		if err != nil {
 			return false, err
 		}
@@ -138,10 +127,6 @@ func (t *ConsulTarget) metadataPrefix(es *ExportedService) string {
 // Write out metadata to where it belongs in Consul using a transaction.  This
 // should only ever get called by the current leader
 func (t *ConsulTarget) writeKV(es *ExportedService) error {
-	var err error
-	tags := []string{"kv:metadata", "method:put"}
-	defer stats.IncrSuccessOrFail(err, "consul.kv", tags)
-
 	esJson, err := json.Marshal(es)
 	if err != nil {
 		return errors.Wrap(err, "Error marshaling ExportedService JSON")
@@ -152,9 +137,7 @@ func (t *ConsulTarget) writeKV(es *ExportedService) error {
 		Value: esJson,
 	}
 
-	stats.WithTiming("consul.kv.time", tags, func() {
-		_, err = t.client.KV().Put(&kvPair, nil)
-	})
+	_, err = t.kv.Put(&kvPair, nil, []string{"kv:metadata"})
 
 	return err
 }
@@ -177,16 +160,10 @@ func (t *ConsulTarget) asrFromExportedService(es *ExportedService) *capi.AgentSe
 // shouldUpdateKV checks if the hash of the ExportedService is the same as the
 // hash stored in Consul.  If they differ, KV data is updated.
 func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
-	var kvPair *capi.KVPair
-	var err error
-
 	key := t.metadataPrefix(es)
 	qo := capi.QueryOptions{RequireConsistent: true}
-	tags := []string{"kv:metadata", "method:get"}
 
-	stats.WithTiming("consul.kv.time", tags, func() {
-		kvPair, _, err = t.client.KV().Get(key, &qo)
-	})
+	kvPair, _, err := t.kv.Get(key, &qo, []string{"kv:metadata"})
 	if err != nil {
 		return true, errors.Wrap(err, "Error getting KV hash")
 	}
@@ -220,14 +197,7 @@ func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
 // returns true if the active AgentService in Consul is equivalent to the
 // AgentServiceRegistration passed in.
 func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (bool, error) {
-	var err error
-	var services map[string]*capi.AgentService
-
-	tags := []string{"method:get"}
-	stats.WithTiming("consul.service.time", tags, func() {
-		services, err = t.client.Agent().Services()
-	})
-	stats.IncrSuccessOrFail(err, "consul.service", tags)
+	services, err := t.agent.Services()
 	if err != nil {
 		return false, errors.Wrap(err, "Error getting agent services")
 	}
@@ -258,7 +228,6 @@ func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (
 
 func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
 	var exportedNodes exportedNodeList
-	var err error
 	tags := []string{"kv:nodes"}
 
 	if !t.elector.IsLeader() {
@@ -289,11 +258,7 @@ func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
 
 	key := fmt.Sprintf("%s/nodes/%s", t.kvPrefix, t.clusterId)
 
-	var current *capi.KVPair
-	stats.WithTiming("consul.kv.time", append(tags, "method:get"), func() {
-		current, _, err = t.client.KV().Get(key, &capi.QueryOptions{})
-	})
-	stats.IncrSuccessOrFail(err, "consul.kv", append(tags, "method:get"))
+	current, _, err := t.kv.Get(key, &capi.QueryOptions{}, tags)
 	if err != nil {
 		return errors.Wrapf(err, "Error getting %s key", key)
 	}
@@ -308,11 +273,7 @@ func (t *ConsulTarget) WriteNodes(nodes []*v1.Node) error {
 		Value: nodeJson,
 	}
 
-	stats.WithTiming("consul.kv.time", append(tags, "method:put"), func() {
-		_, err = t.client.KV().Put(&kv, nil)
-	})
-	stats.IncrSuccessOrFail(err, "consul.kv", append(tags, "method:put"))
-	if err != nil {
+	if _, err := t.kv.Put(&kv, nil, tags); err != nil {
 		return errors.Wrapf(err, "Error writing %s key", key)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/github/kube-service-exporter/pkg/consul"
 	"github.com/github/kube-service-exporter/pkg/stats"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
@@ -19,6 +20,7 @@ type LeaderElector interface {
 
 type ConsulLeaderElector struct {
 	client    *capi.Client
+	kv        *consul.InstrumentedKV
 	clusterId string
 	clientId  string
 	isLeader  bool
@@ -38,6 +40,7 @@ func NewConsulLeaderElector(cfg *capi.Config, prefix string, clusterId string, c
 
 	return &ConsulLeaderElector{
 		client:    client,
+		kv:        consul.NewInstrumentedKV(client),
 		clientId:  clientId,
 		clusterId: clusterId,
 		mutex:     &sync.RWMutex{},
@@ -56,7 +59,7 @@ func (le *ConsulLeaderElector) IsLeader() bool {
 
 func (le *ConsulLeaderElector) HasLeader() (bool, error) {
 	qo := capi.QueryOptions{RequireConsistent: true}
-	kvPair, _, err := le.client.KV().Get(le.leaderKey(), &qo)
+	kvPair, _, err := le.kv.Get(le.leaderKey(), &qo, []string{"kv:leader"})
 	if err != nil {
 		return false, errors.Wrap(err, "In HasLeader")
 	}
