@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/github/kube-service-exporter/pkg/stats"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
@@ -49,12 +50,15 @@ func NewNodeWatcher(config *NodeInformerConfig, target ExportTarget, nodeSelecto
 	nw.informer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
+				stats.Client().Incr("kubernetes.nodes", []string{"handler:add"}, 1)
 				nw.exportNodes(target, nodeSelector)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
+				stats.Client().Incr("kubernetes.nodes", []string{"handler:update"}, 1)
 				nw.exportNodes(target, nodeSelector)
 			},
 			DeleteFunc: func(obj interface{}) {
+				stats.Client().Incr("kubernetes.nodes", []string{"handler:delete"}, 1)
 				nw.exportNodes(target, nodeSelector)
 			}})
 
