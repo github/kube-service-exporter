@@ -14,6 +14,19 @@ spec:
     metadata:
       labels:
         k8s-app: kube-service-exporter
+      annotations:
+        service-discovery.datadoghq.com/kube-syslog.check_names: '["go_expvar"]'
+        service-discovery.datadoghq.com/kube-syslog.init_configs: '[{}]'
+        service-discovery.datadoghq.com/kube-syslog.instances: |
+          [{ "expvar_url": "http://%%host%%:8080/debug/vars",
+             "namespace": "kube_service_exporter",
+             "tags": ["%%tags%%"] }]
+        com.datadoghq.sd/check_names: '["go_expvar"]'
+        com.datadoghq.sd/init_configs: '[{}]'
+        com.datadoghq.sd/instances: |
+          [{ "expvar_url": "http://%%host%%:8080/debug/vars",
+             "namespace": "kube_service_exporter",
+             "tags": [ "%%tags%%" ] }]
     spec:
       containers:
       - name: kube-service-exporter
