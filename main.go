@@ -105,6 +105,7 @@ func main() {
 	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
 	<-sigC
 	log.Println("Shutting down...")
+	stats.Client().Gauge("shutdown", 1, nil, 1)
 
 	go func() {
 		defer close(stoppedC)
@@ -130,5 +131,4 @@ func main() {
 		}
 		os.Stdout.Sync()
 	})
-	stats.Client().Gauge("shutdown", 1, nil, 1)
 }
