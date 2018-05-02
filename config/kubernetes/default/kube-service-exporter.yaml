@@ -38,6 +38,19 @@ spec:
           limits:
             cpu: "250m"
             memory: "512Mi"
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          timeoutSeconds: 5
+          httpGet:
+            path: /healthz
+            port: http
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "5"]
         env:
         - name: KSE_CONSUL_HOST
           valueFrom:
