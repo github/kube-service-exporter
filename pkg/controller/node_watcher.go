@@ -50,15 +50,15 @@ func NewNodeWatcher(config *NodeInformerConfig, target ExportTarget, nodeSelecto
 	nw.informer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				stats.Client().Incr("kubernetes.nodes", []string{"handler:add"}, 1)
+				stats.Client().Incr("kubernetes.node_handler", []string{"handler:add"}, 1)
 				nw.exportNodes(target, nodeSelector)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				stats.Client().Incr("kubernetes.nodes", []string{"handler:update"}, 1)
+				stats.Client().Incr("kubernetes.node_handler", []string{"handler:update"}, 1)
 				nw.exportNodes(target, nodeSelector)
 			},
 			DeleteFunc: func(obj interface{}) {
-				stats.Client().Incr("kubernetes.nodes", []string{"handler:delete"}, 1)
+				stats.Client().Incr("kubernetes.node_handler", []string{"handler:delete"}, 1)
 				nw.exportNodes(target, nodeSelector)
 			}})
 
