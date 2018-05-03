@@ -4,7 +4,7 @@ metadata:
   name: kube-service-exporter
   namespace: kube-system
   labels:
-    k8s-app: kube-system
+    k8s-app: kube-service-exporter
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -14,6 +14,13 @@ spec:
     metadata:
       labels:
         k8s-app: kube-service-exporter
+      annotations:
+        service-discovery.datadoghq.com/kube-service-exporter.check_names: '["go_expvar"]'
+        service-discovery.datadoghq.com/kube-service-exporter.init_configs: '[{}]'
+        service-discovery.datadoghq.com/kube-service-exporter.instances: |
+          [{ "expvar_url": "http://%%host%%:8080/debug/vars",
+             "namespace": "kube_service_exporter.go_expvar",
+             "tags": ["%%tags%%"] }]
     spec:
       containers:
       - name: kube-service-exporter
@@ -25,6 +32,19 @@ spec:
           limits:
             cpu: "250m"
             memory: "512Mi"
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          timeoutSeconds: 5
+          httpGet:
+            path: /healthz
+            port: http
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "5"]
         env:
         - name: KSE_CONSUL_HOST
           valueFrom:
@@ -36,4 +56,9 @@ spec:
               fieldPath: metadata.name
         - name: KSE_NODE_SELECTOR
           value: kubernetes.github.com/role=node
-
+        - name: KSE_DOGSTATSD_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KSE_DOGSTATSD_PORT
+          value: "28125"

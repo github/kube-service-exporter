@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/DataDog/datadog-go"
+  packages = ["statsd"]
+  revision = "e67964b4021ad3a334e748e8811eb3cd6becbc6e"
+  version = "2.1.0"
+
+[[projects]]
   name = "github.com/PuerkitoBio/purell"
   packages = ["."]
   revision = "8a290539e2e8629dbc4e6bad948158f790ec31f4"
@@ -590,6 +596,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3be76b4f4d1e416cbe6e3398459d3e7e9c4dae8fce6d05f24a723c709ce9d29b"
+  inputs-digest = "51e5a7a51f7f37204f50cd3a2f45f58d8790d5eaa5cbeec233c13ceb50458eea"
   solver-name = "gps-cdcl"
   solver-version = 1

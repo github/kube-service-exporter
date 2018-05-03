@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/github/kube-service-exporter/pkg/stats"
 	"github.com/github/kube-service-exporter/pkg/util"
 
 	"k8s.io/api/core/v1"
@@ -132,8 +133,12 @@ func (sw *ServiceWatcher) Stop() {
 }
 
 func (sw *ServiceWatcher) addService(service *v1.Service, target ExportTarget) {
+	start := time.Now()
 	defer sw.wg.Done()
 	sw.wg.Add(1)
+	tags := []string{"handler:add"}
+	stats.Client().Incr("kubernetes.service_handler", tags, 1)
+	defer stats.Client().Timing("kubernetes.service_handler.time", time.Since(start), tags, 1)
 
 	if !IsExportableService(service) {
 		return
@@ -143,6 +148,7 @@ func (sw *ServiceWatcher) addService(service *v1.Service, target ExportTarget) {
 	for _, es := range exportedServices {
 		log.Printf("Add service %s", es.Id())
 		_, err := target.Create(es)
+		stats.IncrSuccessOrFail(err, "target.service", []string{"handler:create", "service:" + es.Id()})
 		if err != nil {
 			log.Printf("Error adding %+v", es)
 		}
@@ -150,8 +156,12 @@ func (sw *ServiceWatcher) addService(service *v1.Service, target ExportTarget) {
 }
 
 func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.Service, target ExportTarget) {
+	start := time.Now()
 	defer sw.wg.Done()
 	sw.wg.Add(1)
+	tags := []string{"handler:update"}
+	stats.Client().Incr("kubernetes.service_handler", tags, 1)
+	defer stats.Client().Timing("kubernetes.service_handler.time", time.Since(start), tags, 1)
 
 	// Delete services that are not exportable (because they aren't LoadBalancer/opt-in)
 	if !IsExportableService(newService) {
@@ -165,7 +175,9 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 	for _, es := range newExportedServices {
 		newIds[es.Id()] = true
 		log.Printf("Update service %s", es.Id())
+
 		_, err := target.Update(es)
+		stats.IncrSuccessOrFail(err, "target.service", []string{"handler:update", "service:" + es.Id()})
 		if err != nil {
 			log.Printf("Error updating %+v", es)
 		}
@@ -184,16 +196,20 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 }
 
 func (sw *ServiceWatcher) deleteService(service *v1.Service, target ExportTarget) {
+	start := time.Now()
 	defer sw.wg.Done()
 	sw.wg.Add(1)
+	tags := []string{"handler:delete"}
+	stats.Client().Incr("kubernetes.service_handler", tags, 1)
+	defer stats.Client().Timing("kubernetes.service_handler.time", time.Since(start), tags, 1)
 
 	exportedServices, _ := NewExportedServicesFromKubeService(service, sw.clusterId)
 	for _, es := range exportedServices {
 		log.Printf("Delete service %s", es.Id())
 		_, err := target.Delete(es)
+		stats.IncrSuccessOrFail(err, "target.service", []string{"handler:delete", "service:" + es.Id()})
 		if err != nil {
 			log.Printf("Error deleting %+v", es)
 		}
-
 	}
 }
