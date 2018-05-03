@@ -21,12 +21,6 @@ spec:
           [{ "expvar_url": "http://%%host%%:8080/debug/vars",
              "namespace": "kube_service_exporter.go_expvar",
              "tags": ["%%tags%%"] }]
-        com.datadoghq.sd/check_names: '["go_expvar"]'
-        com.datadoghq.sd/init_configs: '[{}]'
-        com.datadoghq.sd/instances: |
-          [{ "expvar_url": "http://%%host%%:8080/debug/vars",
-             "namespace": "kube_service_exporter.go_expvar",
-             "tags": [ "%%tags%%" ] }]
     spec:
       containers:
       - name: kube-service-exporter
