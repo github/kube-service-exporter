@@ -132,6 +132,10 @@ func (le *ConsulLeaderElector) Run() error {
 	}
 }
 
+func (le *ConsulLeaderElector) String() string {
+	return "Consul leadership elector"
+}
+
 func (le *ConsulLeaderElector) stepDown(lock *capi.Lock) {
 	le.setIsLeader(false)
 	lock.Unlock()

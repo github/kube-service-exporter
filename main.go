@@ -17,6 +17,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+type RunStopper interface {
+	Run() error
+	Stop()
+	String() string
+}
+
 func main() {
 	viper.SetEnvPrefix("KSE")
 	viper.AutomaticEnv()
@@ -41,6 +47,7 @@ func main() {
 	httpPort := viper.GetInt("HTTP_PORT")
 
 	stopTimeout := 10 * time.Second
+	stoppedC := make(chan struct{})
 
 	if !viper.IsSet("CLUSTER_ID") {
 		log.Fatalf("Please set the KSE_CLUSTER_ID environment variable to a unique cluster Id")
@@ -54,8 +61,6 @@ func main() {
 		log.Fatal(err)
 	}
 	stats.Client().Gauge("start", 1, nil, 1)
-
-	stoppedC := make(chan struct{})
 
 	ic, err := controller.NewInformerConfig()
 	if err != nil {
@@ -81,11 +86,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	go func() {
-		if err := elector.Run(); err != nil {
-			log.Fatal(err)
-		}
-	}()
 
 	target, err := controller.NewConsulTarget(consulCfg, kvPrefix, clusterId, elector)
 	if err != nil {
@@ -93,13 +93,19 @@ func main() {
 	}
 
 	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
-	go sw.Run()
-
 	nw := controller.NewNodeWatcher(nodeIC, target, nodeSelector)
-	go nw.Run()
-
 	httpSrv := server.New(httpIp, httpPort, stopTimeout)
-	go httpSrv.Run()
+
+	runStoppers := []RunStopper{elector, sw, nw, httpSrv}
+
+	for _, rs := range runStoppers {
+		go func(rs RunStopper) {
+			log.Printf("Starting %s...", rs.String())
+			if err := rs.Run(); err != nil {
+				log.Fatal(err)
+			}
+		}(rs)
+	}
 
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
@@ -109,15 +115,10 @@ func main() {
 
 	go func() {
 		defer close(stoppedC)
-		httpSrv.Stop()
-		log.Println("Stopped http Server")
-		elector.Stop()
-		log.Println("Stopped Consul leadership elector.")
-		sw.Stop()
-		log.Println("Stopped Service Watcher.")
-		nw.Stop()
-		log.Println("Stopped Node Watcher.")
-
+		for _, rs := range runStoppers {
+			rs.Stop()
+			log.Printf("Stopped %s.", rs.String())
+		}
 	}()
 
 	stats.WithTiming("shutdown_time", nil, func() {
