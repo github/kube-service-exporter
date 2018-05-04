@@ -65,14 +65,19 @@ func NewNodeWatcher(config *NodeInformerConfig, target ExportTarget, nodeSelecto
 	return nw
 }
 
-func (nw *NodeWatcher) Run() {
+func (nw *NodeWatcher) Run() error {
 	nw.informer.Informer().Run(nw.stopC)
+	return nil
 }
 
 func (nw *NodeWatcher) Stop() {
 	close(nw.stopC)
 	// wait until the handlers have completed
 	nw.wg.Wait()
+}
+
+func (sw *NodeWatcher) String() string {
+	return "Kubernetes Node handler"
 }
 
 func (nw *NodeWatcher) exportNodes(target ExportTarget, selector string) {

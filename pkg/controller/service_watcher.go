@@ -122,14 +122,19 @@ func NewServiceWatcher(config *InformerConfig, namespaces []string, clusterId st
 	return sw
 }
 
-func (sw *ServiceWatcher) Run() {
+func (sw *ServiceWatcher) Run() error {
 	sw.controller.Run(sw.stopC)
+	return nil
 }
 
 func (sw *ServiceWatcher) Stop() {
 	close(sw.stopC)
 	// wait until the handlers have completed
 	sw.wg.Wait()
+}
+
+func (sw *ServiceWatcher) String() string {
+	return "Kubernetes Service handler"
 }
 
 func (sw *ServiceWatcher) addService(service *v1.Service, target ExportTarget) {

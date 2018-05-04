@@ -32,14 +32,18 @@ func New(ip string, port int, stopTimeout time.Duration) *Server {
 	}
 }
 
-func (s *Server) Run() {
-	s.srv.ListenAndServe()
+func (s *Server) Run() error {
+	return s.srv.ListenAndServe()
 }
 
 func (s *Server) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), s.stopTimeout)
 	defer cancel()
 	s.srv.Shutdown(ctx)
+}
+
+func (s *Server) String() string {
+	return "http server"
 }
 
 func ping(w http.ResponseWriter, r *http.Request) {
