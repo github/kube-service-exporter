@@ -100,10 +100,10 @@ func main() {
 
 	for _, rs := range runStoppers {
 		go func(rs RunStopper) {
+			log.Printf("Starting %s...", rs.String())
 			if err := rs.Run(); err != nil {
 				log.Fatal(err)
 			}
-			log.Printf("Starting %s...", rs.String())
 		}(rs)
 	}
 
