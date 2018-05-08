@@ -1,14 +1,15 @@
 apiVersion: extensions/v1beta1
-kind: DaemonSet
+kind: Deployment
 metadata:
-  name: kube-service-exporter
   namespace: kube-system
+  name: kube-service-exporter
   labels:
     k8s-app: kube-service-exporter
 spec:
-  updateStrategy:
-    type: RollingUpdate
+  replicas: 2
+  strategy:
     rollingUpdate:
+      maxSurge: "100%"
       maxUnavailable: "50%"
   template:
     metadata:
@@ -62,3 +63,5 @@ spec:
               fieldPath: spec.nodeName
         - name: KSE_DOGSTATSD_PORT
           value: "28125"
+        - name: KSE_SERVICES_ENABLED
+          value: "false"

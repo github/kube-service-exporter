@@ -33,6 +33,7 @@ func main() {
 	viper.SetDefault("DOGSTATSD_PORT", 8125)
 	viper.SetDefault("HTTP_IP", "")
 	viper.SetDefault("HTTP_PORT", 8080)
+	viper.SetDefault("SERVICES_ENABLED", false)
 
 	namespaces := viper.GetStringSlice("NAMESPACE_LIST")
 	clusterId := viper.GetString("CLUSTER_ID")
@@ -45,6 +46,7 @@ func main() {
 	dogstatsdPort := viper.GetInt("DOGSTATSD_PORT")
 	httpIp := viper.GetString("HTTP_IP")
 	httpPort := viper.GetInt("HTTP_PORT")
+	servicesEnabled := viper.GetBool("SERVICES_ENABLED")
 
 	stopTimeout := 10 * time.Second
 	stoppedC := make(chan struct{})
@@ -87,7 +89,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	target, err := controller.NewConsulTarget(consulCfg, kvPrefix, clusterId, elector)
+	targetCfg := controller.ConsulTargetConfig{
+		ConsulConfig:    consulCfg,
+		KvPrefix:        kvPrefix,
+		ClusterId:       clusterId,
+		Elector:         elector,
+		ServicesEnabled: servicesEnabled,
+	}
+	target, err := controller.NewConsulTarget(targetCfg)
 	if err != nil {
 		log.Fatal(err)
 	}

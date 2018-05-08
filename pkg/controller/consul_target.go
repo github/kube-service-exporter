@@ -20,14 +20,15 @@ import (
 )
 
 type ConsulTarget struct {
-	client    *capi.Client
-	elector   leader.LeaderElector
-	hostIP    string
-	kvPrefix  string
-	wg        sync.WaitGroup
-	clusterId string
-	kv        *consul.InstrumentedKV
-	agent     *consul.InstrumentedAgent
+	client          *capi.Client
+	elector         leader.LeaderElector
+	hostIP          string
+	kvPrefix        string
+	wg              sync.WaitGroup
+	clusterId       string
+	servicesEnabled bool
+	kv              *consul.InstrumentedKV
+	agent           *consul.InstrumentedAgent
 }
 
 type ExportedNode struct {
@@ -35,29 +36,41 @@ type ExportedNode struct {
 	Address string
 }
 
+type ConsulTargetConfig struct {
+	ConsulConfig *capi.Config
+	KvPrefix     string
+	ClusterId    string
+	Elector      leader.LeaderElector
+	// ServicesEnabled defines whether or not to store services as Consul Services
+	// in addition to in KV metadata. This option requires kube-service-exporter
+	// to be deployed as a DaemonSet
+	ServicesEnabled bool
+}
+
 type exportedNodeList []ExportedNode
 
 var _ ExportTarget = (*ConsulTarget)(nil)
 
-func NewConsulTarget(cfg *capi.Config, kvPrefix string, clusterId string, elector leader.LeaderElector) (*ConsulTarget, error) {
-	hostIP, _, err := net.SplitHostPort(cfg.Address)
+func NewConsulTarget(cfg ConsulTargetConfig) (*ConsulTarget, error) {
+	hostIP, _, err := net.SplitHostPort(cfg.ConsulConfig.Address)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := capi.NewClient(cfg)
+	client, err := capi.NewClient(cfg.ConsulConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ConsulTarget{
-		client:    client,
-		elector:   elector,
-		hostIP:    hostIP,
-		clusterId: clusterId,
-		kvPrefix:  kvPrefix,
-		kv:        consul.NewInstrumentedKV(client),
-		agent:     consul.NewInstrumentedAgent(client),
+		client:          client,
+		elector:         cfg.Elector,
+		hostIP:          hostIP,
+		clusterId:       cfg.ClusterId,
+		kvPrefix:        cfg.KvPrefix,
+		servicesEnabled: cfg.ServicesEnabled,
+		kv:              consul.NewInstrumentedKV(client),
+		agent:           consul.NewInstrumentedAgent(client),
 	}, nil
 }
 
@@ -197,6 +210,10 @@ func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
 // returns true if the active AgentService in Consul is equivalent to the
 // AgentServiceRegistration passed in.
 func (t *ConsulTarget) shouldUpdateService(asr *capi.AgentServiceRegistration) (bool, error) {
+	if !t.servicesEnabled {
+		return false, nil
+	}
+
 	services, err := t.agent.Services()
 	if err != nil {
 		return false, errors.Wrap(err, "Error getting agent services")
