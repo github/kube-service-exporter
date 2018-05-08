@@ -57,7 +57,12 @@ func (s *ConsulTargetSuite) SetupTest() {
 	s.consulServer = tests.NewTestingConsulServer(s.T())
 	s.consulServer.Start()
 	elector := &fakeElector{isLeader: true, hasLeader: true}
-	s.target, _ = NewConsulTarget(s.consulServer.Config, KvPrefix, ClusterId, elector)
+	s.target, _ = NewConsulTarget(ConsulTargetConfig{
+		ConsulConfig:    s.consulServer.Config,
+		KvPrefix:        KvPrefix,
+		ClusterId:       ClusterId,
+		ServicesEnabled: true,
+		Elector:         elector})
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {
@@ -249,4 +254,26 @@ func (s *ConsulTargetSuite) TestShouldWriteNodes() {
 	s.target.WriteNodes([]*v1.Node{&node})
 	_, meta, _ = s.consulServer.Client.KV().Get(key, nil)
 	s.Equal(lastIndex, meta.LastIndex, "Should not write duplicate data")
+}
+
+func (s *ConsulTargetSuite) TestShouldNotUpdateService() {
+	elector := &fakeElector{isLeader: true, hasLeader: true}
+	target, _ := NewConsulTarget(ConsulTargetConfig{
+		ConsulConfig:    s.consulServer.Config,
+		KvPrefix:        KvPrefix,
+		ClusterId:       ClusterId,
+		ServicesEnabled: false,
+		Elector:         elector})
+
+	es := &ExportedService{
+		ClusterId: ClusterId,
+		Namespace: "ns1",
+		Name:      "name1",
+		PortName:  "http",
+		Port:      32001}
+
+	asr := target.asrFromExportedService(es)
+	ok, err := target.shouldUpdateService(asr)
+	s.NoError(err)
+	s.False(ok, "Services should not get updated when ServicesEnabled is false")
 }
