@@ -44,6 +44,8 @@ const (
 	ServiceAnnotationLoadBalancerServicePerCluster = "kube-service-exporter.github.com/load-balancer-service-per-cluster"
 
 	ServiceAnnotationLoadBalancerDNSName = "kube-service-exporter.github.com/load-balancer-dns-name"
+
+	ServiceAnnotationCustomAttrs = "kube-service-exporter.github.com/custom-attrs"
 )
 
 type ExportedService struct {
@@ -77,6 +79,8 @@ type ExportedService struct {
 
 	// the port the load balancer should listen on
 	LoadBalancerListenPort int32 `json:"load_balancer_listen_port"`
+
+	CustomAttrs map[string]interface{} `json:"custom_attrs"`
 }
 
 // NewExportedServicesFromKubeService returns a slice of ExportedServices, one
@@ -177,6 +181,18 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 			return nil, errors.Wrap(err, "Error setting ServicePerCluster")
 		}
 		es.ServicePerCluster = parsed
+	}
+
+	if val, ok := service.Annotations[ServiceAnnotationCustomAttrs]; ok {
+		var customAttrs map[string]interface{}
+		err := json.Unmarshal([]byte(val), &customAttrs)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Error parsing customattrs JSON object")
+		}
+
+		es.CustomAttrs = customAttrs
+	} else {
+		es.CustomAttrs = map[string]interface{}{}
 	}
 
 	return es, nil

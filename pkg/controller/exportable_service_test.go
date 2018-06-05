@@ -87,6 +87,7 @@ func TestNewExportedService(t *testing.T) {
 		assert.Empty(t, es.HealthCheckPath)
 		assert.True(t, es.ServicePerCluster)
 		assert.Empty(t, es.LoadBalancerListenPort)
+		assert.Empty(t, es.CustomAttrs)
 	})
 
 	t.Run("Overridden defaults", func(t *testing.T) {
@@ -99,6 +100,7 @@ func TestNewExportedService(t *testing.T) {
 		svc.Annotations[ServiceAnnotationLoadBalancerHealthCheckPort] = "32001"
 		svc.Annotations[ServiceAnnotationLoadBalancerServicePerCluster] = "false"
 		svc.Annotations[ServiceAnnotationLoadBalancerListenPort] = "32768"
+		svc.Annotations[ServiceAnnotationCustomAttrs] = `{"foo":"bar", "baz":["qux"]}`
 
 		es, err := NewExportedService(svc, "cluster", portIdx)
 		assert.NoError(t, err)
@@ -109,6 +111,7 @@ func TestNewExportedService(t *testing.T) {
 		assert.False(t, es.ServicePerCluster)
 		assert.Equal(t, "internal", es.LoadBalancerClass)
 		assert.Equal(t, int32(32768), es.LoadBalancerListenPort)
+		assert.Equal(t, map[string]interface{}{"foo": "bar", "baz": []interface{}{"qux"}}, es.CustomAttrs)
 	})
 
 	t.Run("Malformed ServicePerCluster Annotation", func(t *testing.T) {
@@ -195,11 +198,12 @@ func TestJSON(t *testing.T) {
 					"health_check_port": 32123,
 					"proxy_protocol": false,
 					"load_balancer_listen_port": 0,
-					"hash": "cdc3e2e77a74ebc8",
+					"hash": "da96e1c925945147",
 					"ClusterName": "cluster",
 					"port": 32123,
 					"dns_name": "",
 					"backend_protocol": "http",
+					"custom_attrs": {},
 					"load_balancer_class": "" }`
 
 	assert.JSONEq(t, expected, string(b))
