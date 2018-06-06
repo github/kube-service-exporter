@@ -45,6 +45,8 @@ const (
 
 	ServiceAnnotationLoadBalancerDNSName = "kube-service-exporter.github.com/load-balancer-dns-name"
 
+	// CustomAttrs is like a "junk drawer" - clients can put arbitrary json objects in the annotation, and
+	// we'll parse it and make that object available in the consul payload under `.custom_attrs`
 	ServiceAnnotationCustomAttrs = "kube-service-exporter.github.com/custom-attrs"
 )
 
