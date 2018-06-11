@@ -20,9 +20,9 @@ The following Annotations are supported. Note that these Annotations only descri
 * `kube-service-exporter.github.com/load-balancer-health-check-port` - The port for the Health check. If unset, defaults to the Service NodePort.
 * `kube-service-exporter.github.com/load-balancer-service-per-cluster` - If unset (or set to `"false"`), this will create a separately named service *per cluster id*.  This is useful for applications that should *not* be load balanced across multiple clusters.  The default is `"true"`, which will aggregate the same service across different clusters into the same name.  Service uniqueness is defined by a tuple of namespace, name, & port name with an optional cluster id.
 * `kube-service-exporter.github.com/load-balancer-dns-name` - The DNS name that should be routed to this Service.
+* `kube-service-exporter.github.com/custom-attrs` - An arbitrary JSON object that will be parsed and added to the exported consul payload under `.custom_attrs`
 
 
 ## Consul Target
 
 ### Operation
-
