@@ -1,0 +1,36 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    addressable (2.5.2)
+      public_suffix (>= 2.0.2, < 4.0)
+    faraday (0.15.2)
+      multipart-post (>= 1.2, < 3)
+    licensed (1.2.0)
+      bundler (~> 1.10)
+      licensee (~> 9.0)
+      octokit (~> 4.0)
+      pathname-common_prefix (~> 0.0.1)
+      thor (~> 0.19)
+      tomlrb (~> 1.2)
+    licensee (9.6.0)
+      rugged (~> 0.24)
+    multipart-post (2.0.0)
+    octokit (4.9.0)
+      sawyer (~> 0.8.0, >= 0.5.3)
+    pathname-common_prefix (0.0.1)
+    public_suffix (3.0.2)
+    rugged (0.27.2)
+    sawyer (0.8.1)
+      addressable (>= 2.3.5, < 2.6)
+      faraday (~> 0.8, < 1.0)
+    thor (0.20.0)
+    tomlrb (1.2.7)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  licensed
+
+BUNDLED WITH
+   1.16.1
