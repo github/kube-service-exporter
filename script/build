@@ -3,7 +3,4 @@
 set -e
 
 cd "$(dirname "$0")/.."
-docker build -f Dockerfile.build -t build-kube-service-exporter .
-
-docker run build-kube-service-exporter |
-  docker build -f Dockerfile.release -t kube-service-exporter -
+docker build -f Dockerfile -t kube-service-exporter .
