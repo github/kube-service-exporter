@@ -9,14 +9,14 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: kube-service-exporter
 rules:
-  - apiGroups: [""]
-    resources:
-    - nodes
-    - services
-    verbs:
-    - watch
-    - list
-    - get
+- apiGroups: [""]
+  resources:
+  - nodes
+  - services
+  verbs:
+  - watch
+  - list
+  - get
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
