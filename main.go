@@ -14,6 +14,7 @@ import (
 	"github.com/github/kube-service-exporter/pkg/server"
 	"github.com/github/kube-service-exporter/pkg/stats"
 	capi "github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -69,24 +70,24 @@ func main() {
 	}
 
 	if err := stats.Configure(dogstatsdHost, dogstatsdPort); err != nil {
-		log.Fatalf("Error configuring dogstatsd: %v", err)
+		log.Fatal(errors.Wrap(err, "Error setting up dogstatsd"))
 	}
 	stats.Client().Gauge("start", 1, nil, 1)
 
 	ic, err := controller.NewInformerConfig()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "Error setting up Service Watcher"))
 	}
 
 	nodeIC, err := controller.NewNodeInformerConfig()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "Error setting up Node Watcher"))
 	}
 
 	// Get the IP for the local consul agent since we need it in a few places
 	consulIPs, err := net.LookupIP(consulHost)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrapf(err, "Error looking up IP for Consul host: %s", consulHost))
 	}
 
 	consulCfg := capi.DefaultConfig()
@@ -95,7 +96,7 @@ func main() {
 
 	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId, podName)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "Error setting up leader election"))
 	}
 
 	targetCfg := controller.ConsulTargetConfig{
@@ -107,7 +108,7 @@ func main() {
 	}
 	target, err := controller.NewConsulTarget(targetCfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "Error setting up Consul target"))
 	}
 
 	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
@@ -120,7 +121,7 @@ func main() {
 		go func(rs RunStopper) {
 			log.Printf("Starting %s...", rs.String())
 			if err := rs.Run(); err != nil {
-				log.Fatal(err)
+				log.Fatal(errors.Wrapf(err, "Error starting %s", rs.String()))
 			}
 		}(rs)
 	}
