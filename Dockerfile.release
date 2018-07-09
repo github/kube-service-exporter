@@ -1,5 +1,0 @@
-FROM debian:stretch-slim
-
-COPY bin/kube-service-exporter /usr/local/bin
-
-ENTRYPOINT ["/usr/local/bin/kube-service-exporter"]
