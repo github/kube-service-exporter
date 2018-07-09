@@ -37,6 +37,7 @@ func main() {
 	viper.SetDefault("CONSUL_KV_PREFIX", "kube-service-exporter")
 	viper.SetDefault("CONSUL_HOST", "127.0.0.1")
 	viper.SetDefault("CONSUL_PORT", 8500)
+	viper.SetDefault("DOGSTATSD_ENABLED", true)
 	viper.SetDefault("DOGSTATSD_HOST", "127.0.0.1")
 	viper.SetDefault("DOGSTATSD_PORT", 8125)
 	viper.SetDefault("HTTP_IP", "")
@@ -50,6 +51,7 @@ func main() {
 	consulPort := viper.GetInt("CONSUL_PORT")
 	podName := viper.GetString("POD_NAME")
 	nodeSelector := viper.GetString("NODE_SELECTOR")
+	dogstatsdEnabled := viper.GetBool("DOGSTATSD_ENABLED")
 	dogstatsdHost := viper.GetString("DOGSTATSD_HOST")
 	dogstatsdPort := viper.GetInt("DOGSTATSD_PORT")
 	httpIp := viper.GetString("HTTP_IP")
@@ -69,8 +71,12 @@ func main() {
 		log.Printf("Watching the following namespaces: %+v", namespaces)
 	}
 
-	if err := stats.Configure(dogstatsdHost, dogstatsdPort); err != nil {
-		log.Fatal(errors.Wrap(err, "Error setting up dogstatsd"))
+	if dogstatsdEnabled {
+		// if Configure is never called, dogstatsd-go should handle a nil Client
+		// without crashing or sending anything.
+		if err := stats.Configure(dogstatsdHost, dogstatsdPort); err != nil {
+			log.Fatal(errors.Wrap(err, "Error configuring dogstatsd"))
+		}
 	}
 	stats.Client().Gauge("start", 1, nil, 1)
 
