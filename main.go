@@ -17,6 +17,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+var (
+	// Build arguments, set at build-time w/ ldflags -X
+	GitCommit string
+	GitBranch string
+	BuildTime string
+)
+
 type RunStopper interface {
 	Run() error
 	Stop()
@@ -51,6 +58,8 @@ func main() {
 	stopTimeout := 10 * time.Second
 	stoppedC := make(chan struct{})
 
+	log.Printf("Starting kube-service-exporter: built at: %s, git commit: %s, git branch: %s", BuildTime, GitCommit, GitBranch)
+
 	if !viper.IsSet("CLUSTER_ID") {
 		log.Fatalf("Please set the KSE_CLUSTER_ID environment variable to a unique cluster Id")
 	}
@@ -60,7 +69,7 @@ func main() {
 	}
 
 	if err := stats.Configure(dogstatsdHost, dogstatsdPort); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error configuring dogstatsd: %v", err)
 	}
 	stats.Client().Gauge("start", 1, nil, 1)
 
