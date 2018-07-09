@@ -23,6 +23,7 @@ spec:
              "namespace": "kube_service_exporter.go_expvar",
              "tags": ["%%tags%%"] }]
     spec:
+      serviceAccountName: kube-service-exporter
       containers:
       - name: kube-service-exporter
         image: kube-service-exporter
