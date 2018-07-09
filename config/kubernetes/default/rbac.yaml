@@ -3,6 +3,8 @@ kind: ServiceAccount
 metadata:
   name: kube-service-exporter
   namespace: kube-system
+imagePullSecrets:
+- name: ecr-cred
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
