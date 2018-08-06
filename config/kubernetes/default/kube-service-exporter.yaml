@@ -69,4 +69,7 @@ spec:
         - name: KSE_SERVICES_ENABLED
           value: "false"
         - name: KSE_CLUSTER_ID
-          value: "$(KUBE_CLUSTER_NAME)"
+          valueFrom:
+            configMapKeyRef:
+              key: kubernetes_cluster_name
+              name: kube-cluster-metadata
