@@ -5,6 +5,8 @@ metadata:
   name: kube-service-exporter
   labels:
     k8s-app: kube-service-exporter
+  annotations:
+    heaven.githubapp.com/inject-kube-metadata-env-vars-into-containers: "kube-service-exporter"
 spec:
   replicas: 2
   strategy:
@@ -66,3 +68,8 @@ spec:
           value: "28125"
         - name: KSE_SERVICES_ENABLED
           value: "false"
+        - name: KSE_CLUSTER_ID
+          valueFrom:
+            configMapKeyRef:
+              key: kubernetes_cluster_name
+              name: kube-cluster-metadata
