@@ -14,7 +14,15 @@ import (
 	"github.com/github/kube-service-exporter/pkg/server"
 	"github.com/github/kube-service-exporter/pkg/stats"
 	capi "github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+)
+
+var (
+	// Build arguments, set at build-time w/ ldflags -X
+	GitCommit string
+	GitBranch string
+	BuildTime string
 )
 
 type RunStopper interface {
@@ -29,6 +37,7 @@ func main() {
 	viper.SetDefault("CONSUL_KV_PREFIX", "kube-service-exporter")
 	viper.SetDefault("CONSUL_HOST", "127.0.0.1")
 	viper.SetDefault("CONSUL_PORT", 8500)
+	viper.SetDefault("DOGSTATSD_ENABLED", true)
 	viper.SetDefault("DOGSTATSD_HOST", "127.0.0.1")
 	viper.SetDefault("DOGSTATSD_PORT", 8125)
 	viper.SetDefault("HTTP_IP", "")
@@ -42,6 +51,7 @@ func main() {
 	consulPort := viper.GetInt("CONSUL_PORT")
 	podName := viper.GetString("POD_NAME")
 	nodeSelector := viper.GetString("NODE_SELECTOR")
+	dogstatsdEnabled := viper.GetBool("DOGSTATSD_ENABLED")
 	dogstatsdHost := viper.GetString("DOGSTATSD_HOST")
 	dogstatsdPort := viper.GetInt("DOGSTATSD_PORT")
 	httpIp := viper.GetString("HTTP_IP")
@@ -51,6 +61,8 @@ func main() {
 	stopTimeout := 10 * time.Second
 	stoppedC := make(chan struct{})
 
+	log.Printf("Starting kube-service-exporter: built at: %s, git commit: %s, git branch: %s", BuildTime, GitCommit, GitBranch)
+
 	if !viper.IsSet("CLUSTER_ID") {
 		log.Fatalf("Please set the KSE_CLUSTER_ID environment variable to a unique cluster Id")
 	}
@@ -59,25 +71,29 @@ func main() {
 		log.Printf("Watching the following namespaces: %+v", namespaces)
 	}
 
-	if err := stats.Configure(dogstatsdHost, dogstatsdPort); err != nil {
-		log.Fatal(err)
+	if dogstatsdEnabled {
+		// if Configure is never called, dogstatsd-go should handle a nil Client
+		// without crashing or sending anything.
+		if err := stats.Configure(dogstatsdHost, dogstatsdPort); err != nil {
+			log.Fatal(errors.Wrap(err, "Error configuring dogstatsd"))
+		}
 	}
 	stats.Client().Gauge("start", 1, nil, 1)
 
 	ic, err := controller.NewInformerConfig()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "Error setting up Service Watcher"))
 	}
 
 	nodeIC, err := controller.NewNodeInformerConfig()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "Error setting up Node Watcher"))
 	}
 
 	// Get the IP for the local consul agent since we need it in a few places
 	consulIPs, err := net.LookupIP(consulHost)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrapf(err, "Error looking up IP for Consul host: %s", consulHost))
 	}
 
 	consulCfg := capi.DefaultConfig()
@@ -86,7 +102,7 @@ func main() {
 
 	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId, podName)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "Error setting up leader election"))
 	}
 
 	targetCfg := controller.ConsulTargetConfig{
@@ -98,7 +114,7 @@ func main() {
 	}
 	target, err := controller.NewConsulTarget(targetCfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "Error setting up Consul target"))
 	}
 
 	sw := controller.NewServiceWatcher(ic, namespaces, clusterId, target)
@@ -111,7 +127,7 @@ func main() {
 		go func(rs RunStopper) {
 			log.Printf("Starting %s...", rs.String())
 			if err := rs.Run(); err != nil {
-				log.Fatal(err)
+				log.Fatal(errors.Wrapf(err, "Error starting %s", rs.String()))
 			}
 		}(rs)
 	}
