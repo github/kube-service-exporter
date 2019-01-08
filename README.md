@@ -198,11 +198,11 @@ Please see our [contributing document](/CONTRIBUTING.md) if you would like to pa
 
 ## Getting help
 
-If you have a problem or suggestion, please [open an issue](https://github.com/github/octodns/issues/new) in this repository, and we will do our best to help. Please note that this project adheres to the [Contributor Covenant Code of Conduct](/CODE_OF_CONDUCT.md).
+If you have a problem or suggestion, please [open an issue](https://github.com/github/kube-service-exporter/issues/new) in this repository, and we will do our best to help. Please note that this project adheres to the [Contributor Covenant Code of Conduct](/CODE_OF_CONDUCT.md).
 
 ## License
 
-OctoDNS is licensed under the [Apache 2.0 license](LICENSE).
+kube-service-exporter is licensed under the [Apache 2.0 license](LICENSE).
 
 ## Authors
 
