@@ -1,3 +1,4 @@
 bin/
 coverage.out
 tmp/
+.licenses
