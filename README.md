@@ -204,6 +204,8 @@ If you have a problem or suggestion, please [open an issue](https://github.com/g
 
 kube-service-exporter is licensed under the [Apache 2.0 license](LICENSE).
 
-## Authors
+## Maintainers
 
-`kube-service-exporter` was originally designed and authored by [Aaron Brown](https://github.com/aaronbbrown).  It is maintained, reviewed, and tested by the Production Engineering team at GitHub.
+`kube-service-exporter` was originally designed and authored by [Aaron Brown](https://github.com/aaronbbrown).
+It is maintained, reviewed, and tested by the Production Engineering team at GitHub.
+Contact the maintainers: opensource+kube-service-exporter@github.com 
