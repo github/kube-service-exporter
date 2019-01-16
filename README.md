@@ -1,6 +1,8 @@
 # kube-service-exporter
 
-By exporting Kubernetes Service and Node metadata to Consul, `kube-service-exporter` facilitates bringing your own load balancer to Kubernetes installations, including load balancing *across multiple clusters* for highly available cluster designs.
+A Kubernetes controller for enabling load balancing *across multiple clusters*, written in Go.
+
+By exporting Kubernetes Service and Node metadata to Consul, `kube-service-exporter` facilitates bringing an external load balancer to Kubernetes installations for highly available cluster designs.
 
 ## Overview 
 
