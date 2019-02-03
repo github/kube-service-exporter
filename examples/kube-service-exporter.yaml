@@ -1,0 +1,62 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: kube-system
+  name: kube-service-exporter
+  # labels:
+  #   k8s-app: kube-service-exporter
+  # annotations:
+  #   heaven.githubapp.com/inject-kube-metadata-env-vars-into-containers: "kube-service-exporter"
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxSurge: "100%"
+      maxUnavailable: "50%"
+  # template:
+  #   metadata:
+  #     labels:
+  #       k8s-app: kube-service-exporter
+  #     annotations:
+  #       service-discovery.datadoghq.com/kube-service-exporter.check_names: '["go_expvar"]'
+  #       service-discovery.datadoghq.com/kube-service-exporter.init_configs: '[{}]'
+  #       service-discovery.datadoghq.com/kube-service-exporter.instances: |
+  #         [{ "expvar_url": "http://%%host%%:8080/debug/vars",
+  #            "namespace": "kube_service_exporter.go_expvar",
+  #            "tags": ["%%tags%%"] }]
+    spec:
+      serviceAccountName: kube-service-exporter
+      containers:
+      - name: kube-service-exporter
+        image: github/kube-service-exporter:guin
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "256Mi"
+          limits:
+            cpu: "250m"
+            memory: "512Mi"
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          timeoutSeconds: 5
+          httpGet:
+            path: /healthz
+            port: http
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "5"]
+        env:
+        - name: KSE_CONSUL_HOST
+          value: consul # this references the consul Service in your cluster
+        - name: KSE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KSE_SERVICES_ENABLED
+          value: "false"
+        - name: KSE_CLUSTER_ID
+          value: "democluster"
