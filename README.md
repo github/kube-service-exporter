@@ -187,12 +187,17 @@ Exported services are configured with Annotations on the Service, but `kube-serv
 * `KSE_HTTP_PORT` (default: 8080) - The port for the health/stats listener
 * `KSE_SERVICES_ENABLED` (default: false) - Set to "true" to export Consul Services in addition to Consul KV metadata.  Requires additional configuration described :point_up:
 
-
 ## Metrics
 
 ## Consul Target
 
-### Operation
+Please see an [example deploy here](/examples/deploy-example.md).
+
+### Operation 
+
+## How To Use
+
+The public docker image of kube-service-exporter is available on DockerHub. For an example deploy, please see the [Examples folder](/examples/deploy-example.md).
 
 ## Contributing
 
