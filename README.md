@@ -197,7 +197,10 @@ Please see an [example deploy here](/examples/deploy-example.md).
 
 ## How To Use
 
-The public docker image of kube-service-exporter is available on DockerHub. For an example deploy, please see the [Examples folder](/examples/deploy-example.md).
+The current public docker image of kube-service-exporter is available on DockerHub:
+`github/kube-service-exporter:ceb932bbe250bd146efce5cda90ff40df566b90f`
+
+For an example deploy, please see the [Examples folder](/examples/deploy-example.md).
 
 ## Contributing
 
