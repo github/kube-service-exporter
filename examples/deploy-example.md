@@ -25,7 +25,7 @@ consul-64bcfb7c69-qm69n       1/1     Running   0          3d
 
 ### Install kube-service-exporter
 
-In `example/kube-service-exporter.yaml`, set the `KSE_CLUSTER_ID` environment variable to `value:<your-cluster-name-here>`.
+In `example/kube-service-exporter.yaml`, set the `KSE_CLUSTER_ID` environment variable to `value:<your-cluster-name-here>`. In our example, we simply set the cluster name to `minikube`.
 
 ```
 $ kubectl apply -f examples/rbac.yaml
@@ -36,7 +36,7 @@ Check for the pods to appear in the `kube-system` namespace:
 
 ```
 $ kubectl get pods -n kube-system | grep kube-service-exporter
-kube-service-exporter-78455495fd-dp4md      1/1     Running   3          3d
+kube-service-exporter-564dd97bcd-x6w6g      1/1     Running   3          3d
 kube-service-exporter-78455495fd-fv5gm      1/1     Running   3          3d
 ```
 
@@ -46,14 +46,29 @@ Exec into the consul pod:
 ```
 $ kubectl exec -it consul-64bcfb7c69-l7lb9 -- sh
 / # consul kv get -recurse
-kube-service-exporter/leadership/democluster-leader:kube-service-exporter-78455495fd-fv5gm
-kube-service-exporter/nodes/democluster:[{"Name":"minikube","Address":"10.0.2.15"}]
+kube-service-exporter/leadership/minikube-leader:kube-service-exporter-564dd97bcd-x6w6g
+kube-service-exporter/nodes/minikube:[{"Name":"minikube","Address":"10.0.2.15"}]
 ```
 
 ### Deploy and configure a Service
 
-<!-- TODO: NGINX stuff here; set an annotation to something fun-->
+Similarly to exporting node metadata, kube-service-exporter will also export metadata about Services.
 
-Similarly to exporting node metadata, you can also export metadata about Services via Annotations.
+```
+$ kubectl apply -f examples/service.yaml
+```
+
+Exec into the Consul pod to see the result:
+
+```
+$ kubectl exec -it consul-64bcfb7c69-l7lb9 -- sh
+/ # consul kv get -recurse
+kube-service-exporter/leadership/minikube-leader:kube-service-exporter-564dd97bcd-x6w6g
+kube-service-exporter/nodes/minikube:[{"Name":"minikube","Address":"10.0.2.15"}]
+kube-service-exporter/services/kube-system-kse-example-http/clusters/minikube:{"hash":"9d907d682bc31ae4","ClusterName":"minikube","port":32046,"dns_name":"examplecluster.example.net","health_check_path":"","health_check_port":32046,"backend_protocol":"http","proxy_protocol":false,"load_balancer_class":"internal","load_balancer_listen_port":0,"custom_attrs":{"allowed_ips":["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]}}
+```
+
+You now 
+
 
 

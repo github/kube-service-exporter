@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kube-service-exporter.github.com/custom-attrs: |
+      {
+        "allowed_ips": [
+          "10.0.0.0/8",
+          "172.16.0.0/12",
+          "192.168.0.0/16"
+        ]
+      }
+    kube-service-exporter.github.com/exported: "true"
+    kube-service-exporter.github.com/load-balancer-backend-protocol: http
+    kube-service-exporter.github.com/load-balancer-class: internal
+    kube-service-exporter.github.com/load-balancer-dns-name: examplecluster.example.net
+    kube-service-exporter.github.com/load-balancer-service-per-cluster: "false"
+  name: kse-example
+  labels:
+    service: kse-example
+  namespace: kube-system
+spec:
+  ports:
+  - name: http
+    nodePort: 32046
+    port: 8080
+    protocol: TCP
+    targetPort: http
+  selector:
+    app: kse-example
+  type: LoadBalancer
