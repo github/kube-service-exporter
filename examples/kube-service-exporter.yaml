@@ -3,27 +3,18 @@ kind: Deployment
 metadata:
   namespace: kube-system
   name: kube-service-exporter
-  # labels:
-  #   k8s-app: kube-service-exporter
-  # annotations:
-  #   heaven.githubapp.com/inject-kube-metadata-env-vars-into-containers: "kube-service-exporter"
+  labels:
+    k8s-app: kube-service-exporter
 spec:
   replicas: 2
   strategy:
     rollingUpdate:
       maxSurge: "100%"
       maxUnavailable: "50%"
-  # template:
-  #   metadata:
-  #     labels:
-  #       k8s-app: kube-service-exporter
-  #     annotations:
-  #       service-discovery.datadoghq.com/kube-service-exporter.check_names: '["go_expvar"]'
-  #       service-discovery.datadoghq.com/kube-service-exporter.init_configs: '[{}]'
-  #       service-discovery.datadoghq.com/kube-service-exporter.instances: |
-  #         [{ "expvar_url": "http://%%host%%:8080/debug/vars",
-  #            "namespace": "kube_service_exporter.go_expvar",
-  #            "tags": ["%%tags%%"] }]
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-service-exporter
     spec:
       serviceAccountName: kube-service-exporter
       containers:
@@ -59,4 +50,4 @@ spec:
         - name: KSE_SERVICES_ENABLED
           value: "false"
         - name: KSE_CLUSTER_ID
-          value: "democluster"
+          value: "minikube"

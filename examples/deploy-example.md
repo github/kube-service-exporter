@@ -13,7 +13,7 @@
 ### Install consul on your cluster
 
 ```
-kubectl apply -f examples/consul.yaml
+$ kubectl apply -f examples/consul.yaml
 ```
 
 Check for the pod to appear in the `kube-system` namespace:
@@ -47,13 +47,13 @@ Exec into the consul pod:
 $ kubectl exec -it consul-64bcfb7c69-l7lb9 -- sh
 / # consul kv get -recurse
 kube-service-exporter/leadership/democluster-leader:kube-service-exporter-78455495fd-fv5gm
-kube-service-exporter/nodes/guinscluster:[{"Name":"minikube","Address":"10.0.2.15"}]
+kube-service-exporter/nodes/democluster:[{"Name":"minikube","Address":"10.0.2.15"}]
 ```
 
 ### Deploy and configure a Service
 
 <!-- TODO: NGINX stuff here; set an annotation to something fun-->
-<!-- TODO: also make sure we don't need any of the funky annotations -->
 
+Similarly to exporting node metadata, you can also export metadata about Services via Annotations.
 
 
