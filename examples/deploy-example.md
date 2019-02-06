@@ -68,7 +68,7 @@ kube-service-exporter/nodes/minikube:[{"Name":"minikube","Address":"10.0.2.15"}]
 kube-service-exporter/services/kube-system-kse-example-http/clusters/minikube:{"hash":"9d907d682bc31ae4","ClusterName":"minikube","port":32046,"dns_name":"examplecluster.example.net","health_check_path":"","health_check_port":32046,"backend_protocol":"http","proxy_protocol":false,"load_balancer_class":"internal","load_balancer_listen_port":0,"custom_attrs":{"allowed_ips":["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]}}
 ```
 
-You now 
+You now can use the new key/value pair to configure your extermanl load balancer using conul templates (example pending).
 
 
 
