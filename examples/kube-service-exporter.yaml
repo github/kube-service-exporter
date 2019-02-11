@@ -1,0 +1,53 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: kube-system
+  name: kube-service-exporter
+  labels:
+    k8s-app: kube-service-exporter
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxSurge: "100%"
+      maxUnavailable: "50%"
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-service-exporter
+    spec:
+      serviceAccountName: kube-service-exporter
+      containers:
+      - name: kube-service-exporter
+        image: github/kube-service-exporter:ceb932bbe250bd146efce5cda90ff40df566b90f
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "256Mi"
+          limits:
+            cpu: "250m"
+            memory: "512Mi"
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          timeoutSeconds: 5
+          httpGet:
+            path: /healthz
+            port: http
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "5"]
+        env:
+        - name: KSE_CONSUL_HOST
+          value: consul # this references the consul Service in your cluster
+        - name: KSE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KSE_SERVICES_ENABLED
+          value: "false"
+        - name: KSE_CLUSTER_ID
+          value: "minikube"

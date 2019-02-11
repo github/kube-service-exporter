@@ -1,6 +1,8 @@
 # kube-service-exporter
 
-By exporting Kubernetes Service and Node metadata to Consul, `kube-service-exporter` facilitates bringing your own load balancer to Kubernetes installations, including load balancing *across multiple clusters* for highly available cluster designs.
+A Kubernetes controller for enabling load balancing *across multiple clusters*, written in Go.
+
+By exporting Kubernetes Service and Node metadata to Consul, `kube-service-exporter` facilitates bringing an external load balancer to Kubernetes installations for highly available cluster designs.
 
 ## Overview 
 
@@ -185,12 +187,20 @@ Exported services are configured with Annotations on the Service, but `kube-serv
 * `KSE_HTTP_PORT` (default: 8080) - The port for the health/stats listener
 * `KSE_SERVICES_ENABLED` (default: false) - Set to "true" to export Consul Services in addition to Consul KV metadata.  Requires additional configuration described :point_up:
 
-
 ## Metrics
 
 ## Consul Target
 
-### Operation
+Please see an [example deploy here](/examples/deploy-example.md).
+
+### Operation 
+
+## How To Use
+
+The current public docker image of kube-service-exporter is available on DockerHub:
+`github/kube-service-exporter:latest`
+
+For an example deploy, please see the [Examples folder](/examples/deploy-example.md).
 
 ## Contributing
 
