@@ -1,4 +1,22 @@
 language: go
 go:
 - 1.11.x
-- "1.10"
+- '1.10'
+
+services:
+  - docker
+
+before_install:
+  - docker build -t github/kube-service-exporter:travis-testing
+
+deploy:
+  provider: script
+  script: bash script/docker_push
+  on:
+    branch:master
+
+
+env:
+  matrix:
+  - secure: ag5+/JAq1HSpuZCr4ew81dvEIA+6vCdDneSzc4zjxkCR4bu1cTzSwTffj3b5kQtneUbgMmjIaVQoFMbaLxcKcp8Rgs4bOfJlPRBsxngUAsVGfPkVr0ThXezMxvaXFQcN1EOss6KPsz+TOshmQfNtSk+jwgAr/UO8LK2FzsSUJTG2WmL2stamwNPZD1871HzJl9nRgSntpLIPgLGga2E3kyxj6c1bZ/lbYd5Yi+0QXij9FtzzhZ2KvhBvB/Q/JaBp3JeX/bqJnuI5UgnnwgctHwkEZ/+R2OVy/yS5QHg0mMz3BCRfk/70f/jGCSuKzpglnQ5DlQu07JsatdxWAEAGj6DBThUwExg736mlP0hxzS1bt7Ro7+ROzHXFx0BAH0MyIn53rNkEDuL6sou5FTPmApAZQSWgbxvxIQCcG76KnSygyDZFLV1H0AuHmvJFTci6nrkW7vsm3X5zdie1HYUujf6afNgG2JzL6841FSTnjQi53VHnE00dAqlhg+ndBWQ5EdiysA/StlrQKq5KNxnm2yW/er7+Suyo8UEA3gJizVf894aS+/4h/8xCcTzVKzMuEW9mYSihDLt2R0ZyCyCidxDAVPmdv9AHQ/oWEXE0cF+qeFjpap0FIdfo7cMZW9/c3iTeyn7rMptuMZmwEq7nDNpGXpw8u6Mbnt7KW7FFzV4= #DOCKER_USERNAME
+  - secure: zX78ZU+24fXZGI4mqLb0wHK7q+0r6r1eDuK1xhrFWZuwdOu7tqbwboFwym0r05Sq3taALL/0p4/CsRYV6Q7j6SlrFryv0N2WXu7YPBg3Dg46QcI23ZUHHDKTr1bC46iDa5Oa3KU78F8g5qt0bNySoJ+ewmoDK7oEzyC2TO9Xy4kuRDRasTU0LotqXJLeh/ZmNtH2ydIk1WPhJwJ2dRj3XLkvQX+V0XOB4EY0NGx41AJ6k7zVrvP/XPSVsiWgIQiP9Qdven+aMwswC804EaCIUVLl+I9dve2lq+MWKWsn/1kGGbof2apzVPU/hpZZ4nV5Ri4mT8EfhtUL2UBL5eWxJ/u0LPdvnBwhWv8BKx6KcvW4NRb36KXLz9pip8bh6baZiNWRdDPZl+6bVwYOYjLNC/RXWNwBpdQvUb3IT+RERAnxQaFs5a6gEP088ZedbnwGFjAecNVrdQuNresrWFqAqgpDEgG+58CgNhjIU5aQjCpaRswg2BQBemGC/LMH4oOwfLyL4xYqy/HzFDMPcKws6v3vR4Arrcrz8BVLfJ2tEqJlGSDctS0LPObU7yGZ7VwDyxO4oB+wsQil9TFXeJAOBfB5v6oQ6z41/g7zv0SouFHTPG/17Bjvv6cxaRwzB62jNVuNBC8cSbkRLY4uqDf92FuQMjS2NTtZBB+t7R8d/Fo= # DOCKER_PASSWORD
