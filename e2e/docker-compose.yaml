@@ -1,0 +1,42 @@
+version: '3'
+services:
+  consul-template:
+    image: hashicorp/consul-template:alpine
+    # change the entrypoint so consul-template can run as root.  Otherwise, it
+    # can't write to the shared /etc/nginx/conf.d since that's root owned in
+    # the edge-nginx container.
+    entrypoint:
+    - consul-template
+    - -template
+    - '/etc/consul-template/default.conf.ctmpl:/etc/nginx/conf.d/default.conf:pkill -HUP "nginx: master"'
+    - -consul-addr=http://consul-server:8500
+    pid: service:edge-nginx
+    network_mode: bridge
+    links:
+    - consul-server
+    volumes:
+    - nginx-conf-d:/etc/nginx/conf.d:nocopy
+    - ./edge-nginx/default.conf.ctmpl:/etc/consul-template/default.conf.ctmpl
+  edge-nginx:
+    image: nginx:1.15-alpine
+    ports:
+    - "80"
+    network_mode: bridge
+    volumes:
+    - nginx-conf-d:/etc/nginx/conf.d:nocopy
+  consul-server:
+    image: consul
+    ports:
+    - "8500"
+    network_mode: bridge
+    command:
+    - agent
+    - -server
+    - -bootstrap
+    - -bind=0.0.0.0
+    - -client=0.0.0.0
+    - -advertise={{ GetInterfaceIP "eth0" }}
+    - -data-dir=/consul/data
+    - -config-dir=/consul/config
+volumes:
+  nginx-conf-d:

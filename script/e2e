@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+# set -x
+
+REPOROOT="$( cd "$(dirname "$0")/.." ; pwd -P )"
+CLUSTERS=$(kind get clusters)
+
+prepare() {
+  mkdir -p "$REPOROOT/tmp"
+}
+
+create_clusters() {
+  kind create cluster --name cluster1
+  kind create cluster --name cluster2
+}
+
+docker_compose() {
+  docker-compose -f "$REPOROOT/e2e/docker-compose.yaml" "$@"
+}
+
+consul_ip() {
+  local consul_container_id 
+  consul_container_id=$(docker_compose ps -q consul-server)
+  docker inspect "$consul_container_id" | jq -r .[].NetworkSettings.IPAddress
+}
+
+cleanup() {
+  docker_compose kill
+  for config in tmp/kube-service-exporter.yaml tmp/consul.yaml examples/rbac.yaml; do
+    kubectlall delete -f "$REPOROOT/$config"
+  done
+  kind delete cluster --name cluster1
+  kind delete cluster --name cluster2
+  rm -rf "REPOROOT/tmp"
+}
+
+_kubectl() {
+  local config
+  config=$1
+  shift
+  KUBECONFIG="$(kind get kubeconfig-path --name=$config)" kubectl "$@"
+}
+
+kubectlall() {
+  _kubectl cluster1 "$@"
+  _kubectl cluster2 "$@"
+}
+
+apply_kse() {
+  kubectlall apply -f "$REPOROOT/examples/rbac.yaml"
+
+  for cluster in cluster1 cluster2; do
+    CLUSTER_ID="$cluster" envsubst < "$REPOROOT/e2e/kube-service-exporter.yaml" > "$REPOROOT/tmp/kube-service-exporter.yaml"
+    _kubectl "$cluster" apply -f "$REPOROOT/tmp/kube-service-exporter.yaml"
+  done
+}
+
+main() {
+  prepare
+  cleanup || true
+  create_clusters
+
+  docker_compose up -d
+  CONSUL_IP=$(consul_ip) envsubst < "$REPOROOT/e2e/consul.yaml" > "$REPOROOT/tmp/consul.yaml"
+
+  kubectlall apply -f "$REPOROOT/tmp/consul.yaml"
+  # wait for consul to come up and join
+  # TODO: actually check consul membership instead of sleeping
+  sleep 30
+  apply_kse
+  kubectlall delete -f "$REPOROOT/e2e/nginx.yaml"
+  kubectlall apply -f "$REPOROOT/e2e/nginx.yaml"
+}
+
+main
