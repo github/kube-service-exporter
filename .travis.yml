@@ -7,12 +7,11 @@ services:
   - docker
 
 before_install:
-  - docker build -t github/kube-service-exporter:travis-testing
+  - docker build -t github/kube-service-exporter:travis-testing .
 
 deploy:
   provider: script
   script: bash script/docker_push
-
 
 env:
   matrix:
