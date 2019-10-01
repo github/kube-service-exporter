@@ -47,6 +47,7 @@ func main() {
 	namespaces := viper.GetStringSlice("NAMESPACE_LIST")
 	clusterId := viper.GetString("CLUSTER_ID")
 	kvPrefix := viper.GetString("CONSUL_KV_PREFIX")
+	consulDatacenter := viper.GetString("CONSUL_DATACENTER")
 	consulHost := viper.GetString("CONSUL_HOST")
 	consulPort := viper.GetInt("CONSUL_PORT")
 	podName := viper.GetString("POD_NAME")
@@ -99,6 +100,11 @@ func main() {
 	consulCfg := capi.DefaultConfig()
 	consulCfg.Address = fmt.Sprintf("%s:%d", consulIPs[0].String(), consulPort)
 	log.Printf("Using Consul agent at %s", consulCfg.Address)
+
+	if viper.IsSet("CONSUL_DATACENTER") {
+		consulCfg.Datacenter = consulDatacenter
+		log.Printf("Using Consul datacenter %s", consulCfg.Datacenter)
+	}
 
 	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId, podName)
 	if err != nil {
