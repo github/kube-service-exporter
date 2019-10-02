@@ -178,6 +178,7 @@ The following Annotations are supported on the Kubernetes Service resource. Note
 
 Exported services are configured with Annotations on the Service, but `kube-service-exporter` itself is configured with environment variables.  The following configuration options are available:
 * `KSE_CONSUL_KV_PREFIX` (default: kube-service-exporter) - The prefix to use when setting Consul KV keys.
+* `KSE_CONSUL_DATACENTER` (default: Consul Agent Default) - The name of the Consul Datacenter to use
 * `KSE_CONSUL_HOST` (default: 127.0.0.1) - The IP or hostname for the Consul Agent.
 * `KSE_CONSUL_PORT` (default: 8500) - The HTTP port for the Consul Agent.
 * `KSE_DOGSTATSD_ENABLED` (default: true) - Set to "false" to disable sending of dogstatsd metrics
