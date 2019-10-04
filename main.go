@@ -35,6 +35,7 @@ func main() {
 	viper.SetEnvPrefix("KSE")
 	viper.AutomaticEnv()
 	viper.SetDefault("CONSUL_KV_PREFIX", "kube-service-exporter")
+	viper.SetDefault("CONSUL_DATACENTER", "")
 	viper.SetDefault("CONSUL_HOST", "127.0.0.1")
 	viper.SetDefault("CONSUL_PORT", 8500)
 	viper.SetDefault("DOGSTATSD_ENABLED", true)
@@ -97,22 +98,25 @@ func main() {
 		log.Fatal(errors.Wrapf(err, "Error looking up IP for Consul host: %s", consulHost))
 	}
 
-	consulCfg := capi.DefaultConfig()
-	consulCfg.Address = fmt.Sprintf("%s:%d", consulIPs[0].String(), consulPort)
-	log.Printf("Using Consul agent at %s", consulCfg.Address)
+	consulLeaderCfg := capi.DefaultConfig()
+	consulTargetCfg := capi.DefaultConfig()
+	consulAddress := fmt.Sprintf("%s:%d", consulIPs[0].String(), consulPort)
+	consulLeaderCfg.Address = consulAddress
+	consulTargetCfg.Address = consulAddress
+	log.Printf("Using Consul agent at %s", consulAddress)
 
 	if viper.IsSet("CONSUL_DATACENTER") {
-		consulCfg.Datacenter = consulDatacenter
-		log.Printf("Using Consul datacenter %s", consulCfg.Datacenter)
+		consulTargetCfg.Datacenter = consulDatacenter
+		log.Printf("Using Consul datacenter for services %s", consulDatacenter)
 	}
 
-	elector, err := leader.NewConsulLeaderElector(consulCfg, kvPrefix, clusterId, podName)
+	elector, err := leader.NewConsulLeaderElector(consulLeaderCfg, kvPrefix, clusterId, podName)
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "Error setting up leader election"))
 	}
 
 	targetCfg := controller.ConsulTargetConfig{
-		ConsulConfig:    consulCfg,
+		ConsulConfig:    consulTargetCfg,
 		KvPrefix:        kvPrefix,
 		ClusterId:       clusterId,
 		Elector:         elector,
