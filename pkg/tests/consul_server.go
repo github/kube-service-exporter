@@ -1,29 +1,26 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"syscall"
-	"testing"
 	"time"
 
 	capi "github.com/hashicorp/consul/api"
-	"github.com/stretchr/testify/require"
 )
 
 const ConsulPort = "28500" // some port that's not Consul's production port
 
 type TestingConsulServer struct {
 	cmd      *exec.Cmd
-	t        *testing.T
 	NodeName string
 	Client   *capi.Client
 	Config   *capi.Config
 }
 
-func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
-	t.Helper()
+func NewTestingConsulServer() *TestingConsulServer {
 	config := capi.DefaultConfig()
 	config.Address = fmt.Sprintf("127.0.0.1:%s", ConsulPort)
 	nodeName := fmt.Sprintf("consul-test-server-%s", ConsulPort)
@@ -35,7 +32,6 @@ func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
 
 	return &TestingConsulServer{
 		cmd:      cmd,
-		t:        t,
 		NodeName: nodeName,
 		Config:   config}
 }
@@ -43,13 +39,16 @@ func NewTestingConsulServer(t *testing.T) *TestingConsulServer {
 // Start consul in dev mode
 // Logs will go to stdout/stderr
 // Each outer Test* func will get a freshly restarted consul
-func (server *TestingConsulServer) Start() {
-	server.t.Helper()
+func (server *TestingConsulServer) Start() error {
 	err := server.cmd.Start()
-	require.NoError(server.t, err)
+	if err != nil {
+		return err
+	}
 
 	client, err := capi.NewClient(server.Config)
-	require.NoError(server.t, err)
+	if err != nil {
+		return err
+	}
 	server.Client = client
 
 	startedC := make(chan struct{})
@@ -68,15 +67,16 @@ func (server *TestingConsulServer) Start() {
 	timer := time.NewTimer(5 * time.Second)
 	select {
 	case <-timer.C:
-		server.t.Fatal("Took too long to start consul")
+		return errors.New("took too long to start consul")
 	case <-startedC:
 	}
+
+	return nil
 }
 
 // Stop consul.  Wait up to 2 seconds before killing it forcefully
-func (server *TestingConsulServer) Stop() {
-	server.t.Helper()
-	server.cmd.Process.Signal(syscall.SIGINT)
+func (server *TestingConsulServer) Stop() error {
+	server.cmd.Process.Signal(syscall.SIGTERM)
 	stoppedC := make(chan struct{})
 	go func() {
 		defer close(stoppedC)
@@ -84,11 +84,13 @@ func (server *TestingConsulServer) Stop() {
 	}()
 
 	// make sure the stop doesn't take to long
-	timer := time.NewTimer(2 * time.Second)
+	timer := time.NewTimer(5 * time.Second)
 	select {
 	case <-timer.C:
-		server.t.Fatal("Took too long to stop consul")
+		return errors.New("took too long to stop consul")
 	case <-stoppedC:
 		server.cmd.Process.Kill()
 	}
+
+	return nil
 }

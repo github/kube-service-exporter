@@ -251,9 +251,9 @@ func (s *ConsulTargetSuite) TestShouldUpdateService() {
 	target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
 	es := &ExportedService{
 		ClusterId: ClusterId,
-		Namespace: "ns1",
-		Name:      "name1",
-		PortName:  "http",
+		Namespace: "unique-ns1",
+		Name:      "unique-name1",
+		PortName:  "unique-http",
 		Port:      32001}
 
 	asr := target.asrFromExportedService(es)

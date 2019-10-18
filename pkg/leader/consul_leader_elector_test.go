@@ -37,8 +37,10 @@ func TestConsulLeaderElectorSuite(t *testing.T) {
 }
 
 func (s *ConsulLeaderElectorSuite) SetupTest() {
-	s.consulServer = tests.NewTestingConsulServer(s.T())
-	s.consulServer.Start()
+	s.consulServer = tests.NewTestingConsulServer()
+	if err := s.consulServer.Start(); err != nil {
+		s.FailNow("error starting consul", err)
+	}
 	elector, err := NewConsulLeaderElector(s.consulServer.Config, KvPrefix, ClusterId, ClientId)
 	require.NoError(s.T(), err)
 	s.elector = elector
@@ -47,7 +49,9 @@ func (s *ConsulLeaderElectorSuite) SetupTest() {
 
 func (s *ConsulLeaderElectorSuite) TearDownTest() {
 	s.elector.Stop()
-	s.consulServer.Stop()
+	if err := s.consulServer.Stop(); err != nil {
+		s.FailNow("error stopping consul", err)
+	}
 }
 
 func (s *ConsulLeaderElectorSuite) TestElection() {
@@ -73,8 +77,10 @@ func (s *ConsulLeaderElectorSuite) TestElection() {
 }
 
 func TestNewElection(t *testing.T) {
-	consulServer := tests.NewTestingConsulServer(t)
-	consulServer.Start()
+	consulServer := tests.NewTestingConsulServer()
+	if err := consulServer.Start(); err != nil {
+		t.Fatal("error starting consul", err)
+	}
 	elector1, err := NewConsulLeaderElector(consulServer.Config, KvPrefix, ClusterId, ClientId)
 	require.NoError(t, err)
 	go elector1.Run()
@@ -89,5 +95,7 @@ func TestNewElection(t *testing.T) {
 	assert.True(t, WaitForIsLeader(elector2))
 	assert.True(t, elector2.IsLeader())
 	elector2.Stop()
-	consulServer.Stop()
+	if err := consulServer.Stop(); err != nil {
+		t.Fatal("error stopping consul", err)
+	}
 }
