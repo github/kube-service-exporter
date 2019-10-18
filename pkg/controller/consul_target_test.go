@@ -19,6 +19,16 @@ const (
 	ClusterId = "cluster1"
 )
 
+func newDefaultConsulTargetConfig(server *tests.TestingConsulServer) ConsulTargetConfig {
+	elector := &fakeElector{isLeader: true, hasLeader: true}
+	return ConsulTargetConfig{
+		ConsulConfig:    server.Config,
+		KvPrefix:        KvPrefix,
+		ClusterId:       ClusterId,
+		ServicesEnabled: true,
+		Elector:         elector}
+}
+
 // A fake leader elector
 type fakeElector struct {
 	isLeader  bool
@@ -46,7 +56,6 @@ var _ leader.LeaderElector = (*fakeElector)(nil)
 type ConsulTargetSuite struct {
 	suite.Suite
 	consulServer *tests.TestingConsulServer
-	target       *ConsulTarget
 }
 
 func TestConsulTargetSuite(t *testing.T) {
@@ -56,13 +65,6 @@ func TestConsulTargetSuite(t *testing.T) {
 func (s *ConsulTargetSuite) SetupTest() {
 	s.consulServer = tests.NewTestingConsulServer(s.T())
 	s.consulServer.Start()
-	elector := &fakeElector{isLeader: true, hasLeader: true}
-	s.target, _ = NewConsulTarget(ConsulTargetConfig{
-		ConsulConfig:    s.consulServer.Config,
-		KvPrefix:        KvPrefix,
-		ClusterId:       ClusterId,
-		ServicesEnabled: true,
-		Elector:         elector})
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {
@@ -70,6 +72,7 @@ func (s *ConsulTargetSuite) TearDownTest() {
 }
 
 func (s *ConsulTargetSuite) TestCreate() {
+	target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
 	s.T().Run("creates cluster-independent service", func(t *testing.T) {
 		es := &ExportedService{
 			ClusterId: ClusterId,
@@ -78,7 +81,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 			PortName:  "http",
 			Port:      32001}
 
-		ok, err := s.target.Create(es)
+		ok, err := target.Create(es)
 		s.NoError(err)
 		s.True(ok)
 
@@ -102,7 +105,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 			ServicePerCluster: true,
 		}
 
-		ok, err := s.target.Create(es)
+		ok, err := target.Create(es)
 		s.NoError(err)
 		s.True(ok)
 
@@ -132,7 +135,7 @@ func (s *ConsulTargetSuite) TestCreate() {
 		}
 
 		kv := s.consulServer.Client.KV()
-		ok, err := s.target.Create(es)
+		ok, err := target.Create(es)
 		s.NoError(err)
 		s.True(ok)
 
@@ -147,9 +150,42 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.NoError(err)
 		s.Equal(meta["load_balancer_class"], "internal")
 	})
+
+	s.T().Run("Writes to ServiceKeyTmpl", func(t *testing.T) {
+		target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
+		target.serviceKeyTmpl = "services/{{ .LoadBalancerClass }}/{{ id }}"
+
+		es := &ExportedService{
+			ClusterId:         ClusterId,
+			Namespace:         "ns3",
+			Name:              "name3",
+			PortName:          "http",
+			Port:              32003,
+			ServicePerCluster: false,
+			LoadBalancerClass: "internal",
+			HealthCheckPort:   32303,
+		}
+
+		kv := s.consulServer.Client.KV()
+		ok, err := target.Create(es)
+		s.NoError(err)
+		s.True(ok)
+
+		key := fmt.Sprintf("%s/services/%s/%s-%s-%s/clusters/%s", KvPrefix, es.LoadBalancerClass, es.Namespace, es.Name, es.PortName, es.ClusterId)
+		pair, _, err := kv.Get(key, &capi.QueryOptions{})
+		require.NoErrorf(s.T(), err, "Expected err for %s to be nil, got %+v", key, err)
+		require.NotNilf(s.T(), pair, "expected KVPair for %s to be not nil", key)
+
+		var meta map[string]interface{}
+
+		err = json.Unmarshal(pair.Value, &meta)
+		s.NoError(err)
+		s.Equal(meta["load_balancer_class"], "internal")
+	})
 }
 
 func (s *ConsulTargetSuite) TestDelete() {
+	target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
 	es := &ExportedService{
 		ClusterId: ClusterId,
 		Namespace: "ns1",
@@ -159,7 +195,7 @@ func (s *ConsulTargetSuite) TestDelete() {
 	kv := s.consulServer.Client.KV()
 	prefix := fmt.Sprintf("%s/services/ns1-name1-http/clusters/%s", KvPrefix, ClusterId)
 
-	ok, err := s.target.Create(es)
+	ok, err := target.Create(es)
 	s.NoError(err)
 	s.True(ok)
 
@@ -171,7 +207,7 @@ func (s *ConsulTargetSuite) TestDelete() {
 	s.NoError(err)
 	s.NotEmpty(keys)
 
-	ok, err = s.target.Delete(es)
+	ok, err = target.Delete(es)
 	s.NoError(err)
 	s.True(ok)
 
@@ -185,6 +221,7 @@ func (s *ConsulTargetSuite) TestDelete() {
 }
 
 func (s *ConsulTargetSuite) TestShouldUpdateKV() {
+	target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
 	es := &ExportedService{
 		ClusterId: ClusterId,
 		Namespace: "ns1",
@@ -192,25 +229,26 @@ func (s *ConsulTargetSuite) TestShouldUpdateKV() {
 		PortName:  "http",
 		Port:      32001}
 
-	ok, err := s.target.shouldUpdateKV(es)
+	ok, err := target.shouldUpdateKV(es)
 	s.NoError(err)
 	s.True(ok, "Should update KV before first create")
 
-	ok, err = s.target.Create(es)
+	ok, err = target.Create(es)
 	s.NoError(err)
 	s.True(ok)
 
-	ok, err = s.target.shouldUpdateKV(es)
+	ok, err = target.shouldUpdateKV(es)
 	s.NoError(err)
 	s.False(ok, "Should not update KV if same")
 
 	es.Port += 1
-	ok, err = s.target.shouldUpdateKV(es)
+	ok, err = target.shouldUpdateKV(es)
 	s.NoError(err)
 	s.True(ok, "Should update KV after change")
 }
 
 func (s *ConsulTargetSuite) TestShouldUpdateService() {
+	target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
 	es := &ExportedService{
 		ClusterId: ClusterId,
 		Namespace: "ns1",
@@ -218,30 +256,31 @@ func (s *ConsulTargetSuite) TestShouldUpdateService() {
 		PortName:  "http",
 		Port:      32001}
 
-	asr := s.target.asrFromExportedService(es)
-	ok, err := s.target.shouldUpdateService(asr)
+	asr := target.asrFromExportedService(es)
+	ok, err := target.shouldUpdateService(asr)
 	s.NoError(err)
 	s.True(ok, "Should update service before first create")
 
-	ok, err = s.target.Create(es)
+	ok, err = target.Create(es)
 	s.NoError(err)
 	s.True(ok)
 
-	ok, err = s.target.shouldUpdateService(asr)
+	ok, err = target.shouldUpdateService(asr)
 	s.NoError(err)
 	s.False(ok, "Should not update service if AgentServiceRegistration same")
 
 	es.Port += 1
-	asr = s.target.asrFromExportedService(es)
-	ok, err = s.target.shouldUpdateService(asr)
+	asr = target.asrFromExportedService(es)
+	ok, err = target.shouldUpdateService(asr)
 	s.NoError(err)
 	s.True(ok, "Should update Service after change")
 }
 
 func (s *ConsulTargetSuite) TestShouldWriteNodes() {
+	target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
 	var exportedNodes []ExportedNode
 	node := testingNode()
-	s.target.WriteNodes([]*v1.Node{&node})
+	target.WriteNodes([]*v1.Node{&node})
 
 	key := fmt.Sprintf("%s/nodes/%s", KvPrefix, ClusterId)
 	pair, meta, err := s.consulServer.Client.KV().Get(key, nil)
@@ -251,7 +290,7 @@ func (s *ConsulTargetSuite) TestShouldWriteNodes() {
 	s.Len(exportedNodes, 1, "should write 1 node")
 	lastIndex := meta.LastIndex
 
-	s.target.WriteNodes([]*v1.Node{&node})
+	target.WriteNodes([]*v1.Node{&node})
 	_, meta, _ = s.consulServer.Client.KV().Get(key, nil)
 	s.Equal(lastIndex, meta.LastIndex, "Should not write duplicate data")
 }
