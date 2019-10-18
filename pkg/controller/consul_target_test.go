@@ -155,9 +155,9 @@ func (s *ConsulTargetSuite) TestCreate() {
 		s.Equal(meta["load_balancer_class"], "internal")
 	})
 
-	s.T().Run("Writes to ServiceKeyTmpl", func(t *testing.T) {
+	s.T().Run("Writes to ServicesKeyTmpl", func(t *testing.T) {
 		target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
-		target.serviceKeyTmpl = "services/{{ .LoadBalancerClass }}/{{ id }}"
+		target.servicesKeyTmpl = "{{ .LoadBalancerClass }}/{{ id }}"
 
 		es := &ExportedService{
 			ClusterId:         ClusterId,

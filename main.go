@@ -119,7 +119,7 @@ func main() {
 	targetCfg := controller.ConsulTargetConfig{
 		ConsulConfig:    consulTargetCfg,
 		KvPrefix:        kvPrefix,
-		ServiceKeyTmpl:  servicesKeyTemplate,
+		ServicesKeyTmpl: servicesKeyTemplate,
 		ClusterId:       clusterId,
 		Elector:         elector,
 		ServicesEnabled: servicesEnabled,

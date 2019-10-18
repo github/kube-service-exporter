@@ -31,7 +31,7 @@ type ConsulTarget struct {
 	servicesEnabled bool
 	kv              *consul.InstrumentedKV
 	agent           *consul.InstrumentedAgent
-	serviceKeyTmpl  string
+	servicesKeyTmpl string
 }
 
 type ExportedNode struct {
@@ -43,13 +43,13 @@ type ConsulTargetConfig struct {
 	ConsulConfig *capi.Config
 	KvPrefix     string
 
-	// ServiceKeyTmpl is the go template used for each service. Defaults to
+	// ServicesKeyTmpl is the go template used for each service. Defaults to
 	// services/{{ .Id() }}
 	// Can be used to namespace keys for better lookup efficiency, e.g.
 	// services/{{ .LoadBalancerClass }}/{{ .Id() }}
-	ServiceKeyTmpl string
-	ClusterId      string
-	Elector        leader.LeaderElector
+	ServicesKeyTmpl string
+	ClusterId       string
+	Elector         leader.LeaderElector
 	// ServicesEnabled defines whether or not to store services as Consul Services
 	// in addition to in KV metadata. This option requires kube-service-exporter
 	// to be deployed as a DaemonSet
@@ -80,7 +80,7 @@ func NewConsulTarget(cfg ConsulTargetConfig) (*ConsulTarget, error) {
 		servicesEnabled: cfg.ServicesEnabled,
 		kv:              consul.NewInstrumentedKV(client),
 		agent:           consul.NewInstrumentedAgent(client),
-		serviceKeyTmpl:  cfg.ServiceKeyTmpl,
+		servicesKeyTmpl: cfg.ServicesKeyTmpl,
 	}, nil
 }
 
@@ -148,10 +148,10 @@ func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
 }
 
 func (t *ConsulTarget) metadataPrefix(es *ExportedService) (string, error) {
-	if t.serviceKeyTmpl != "" {
+	if t.servicesKeyTmpl != "" {
 		funcMap := template.FuncMap{"id": es.Id}
 
-		tmpl, err := template.New("metadata-prefix").Funcs(funcMap).Parse(t.serviceKeyTmpl)
+		tmpl, err := template.New("metadata-prefix").Funcs(funcMap).Parse(t.servicesKeyTmpl)
 		if err != nil {
 			return "", err
 		}
@@ -161,7 +161,7 @@ func (t *ConsulTarget) metadataPrefix(es *ExportedService) (string, error) {
 			return "", err
 		}
 
-		return fmt.Sprintf("%s/%s/clusters/%s", t.kvPrefix, builder.String(), es.ClusterId), nil
+		return fmt.Sprintf("%s/services/%s/clusters/%s", t.kvPrefix, builder.String(), es.ClusterId), nil
 	}
 	return fmt.Sprintf("%s/services/%s/clusters/%s", t.kvPrefix, es.Id(), es.ClusterId), nil
 }
