@@ -63,12 +63,16 @@ func TestConsulTargetSuite(t *testing.T) {
 }
 
 func (s *ConsulTargetSuite) SetupTest() {
-	s.consulServer = tests.NewTestingConsulServer(s.T())
-	s.consulServer.Start()
+	s.consulServer = tests.NewTestingConsulServer()
+	if err := s.consulServer.Start(); err != nil {
+		s.FailNow("error starting consul", err)
+	}
 }
 
 func (s *ConsulTargetSuite) TearDownTest() {
-	s.consulServer.Stop()
+	if err := s.consulServer.Stop(); err != nil {
+		s.FailNow("error stopping consul", err)
+	}
 }
 
 func (s *ConsulTargetSuite) TestCreate() {
