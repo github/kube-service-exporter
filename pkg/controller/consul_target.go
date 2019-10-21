@@ -8,7 +8,9 @@ import (
 	"net"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/pkg/errors"
@@ -29,6 +31,7 @@ type ConsulTarget struct {
 	servicesEnabled bool
 	kv              *consul.InstrumentedKV
 	agent           *consul.InstrumentedAgent
+	servicesKeyTmpl string
 }
 
 type ExportedNode struct {
@@ -39,8 +42,14 @@ type ExportedNode struct {
 type ConsulTargetConfig struct {
 	ConsulConfig *capi.Config
 	KvPrefix     string
-	ClusterId    string
-	Elector      leader.LeaderElector
+
+	// ServicesKeyTmpl is the go template used for each service. Defaults to
+	// services/{{ .Id() }}
+	// Can be used to namespace keys for better lookup efficiency, e.g.
+	// services/{{ .LoadBalancerClass }}/{{ .Id() }}
+	ServicesKeyTmpl string
+	ClusterId       string
+	Elector         leader.LeaderElector
 	// ServicesEnabled defines whether or not to store services as Consul Services
 	// in addition to in KV metadata. This option requires kube-service-exporter
 	// to be deployed as a DaemonSet
@@ -71,6 +80,7 @@ func NewConsulTarget(cfg ConsulTargetConfig) (*ConsulTarget, error) {
 		servicesEnabled: cfg.ServicesEnabled,
 		kv:              consul.NewInstrumentedKV(client),
 		agent:           consul.NewInstrumentedAgent(client),
+		servicesKeyTmpl: cfg.ServicesKeyTmpl,
 	}, nil
 }
 
@@ -124,8 +134,12 @@ func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
 
 	if t.elector.IsLeader() {
 		log.Printf("[LEADER] Deleting KV metadata for %s", es.Id())
-		_, err := t.kv.DeleteTree(t.metadataPrefix(es), &capi.WriteOptions{}, []string{"kv:metadata"})
+		prefix, err := t.metadataPrefix(es)
 		if err != nil {
+			return false, err
+		}
+
+		if _, err := t.kv.DeleteTree(prefix, &capi.WriteOptions{}, []string{"kv:metadata"}); err != nil {
 			return false, err
 		}
 	}
@@ -133,8 +147,23 @@ func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {
 	return true, nil
 }
 
-func (t *ConsulTarget) metadataPrefix(es *ExportedService) string {
-	return fmt.Sprintf("%s/services/%s/clusters/%s", t.kvPrefix, es.Id(), es.ClusterId)
+func (t *ConsulTarget) metadataPrefix(es *ExportedService) (string, error) {
+	if t.servicesKeyTmpl != "" {
+		funcMap := template.FuncMap{"id": es.Id}
+
+		tmpl, err := template.New("metadata-prefix").Funcs(funcMap).Parse(t.servicesKeyTmpl)
+		if err != nil {
+			return "", err
+		}
+
+		var builder strings.Builder
+		if err := tmpl.Execute(&builder, es); err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("%s/services/%s/clusters/%s", t.kvPrefix, builder.String(), es.ClusterId), nil
+	}
+	return fmt.Sprintf("%s/services/%s/clusters/%s", t.kvPrefix, es.Id(), es.ClusterId), nil
 }
 
 // Write out metadata to where it belongs in Consul using a transaction.  This
@@ -145,8 +174,13 @@ func (t *ConsulTarget) writeKV(es *ExportedService) error {
 		return errors.Wrap(err, "Error marshaling ExportedService JSON")
 	}
 
+	key, err := t.metadataPrefix(es)
+	if err != nil {
+		return errors.Wrap(err, "error calculating key prefix")
+	}
+
 	kvPair := capi.KVPair{
-		Key:   t.metadataPrefix(es),
+		Key:   key,
 		Value: esJson,
 	}
 
@@ -173,7 +207,11 @@ func (t *ConsulTarget) asrFromExportedService(es *ExportedService) *capi.AgentSe
 // shouldUpdateKV checks if the hash of the ExportedService is the same as the
 // hash stored in Consul.  If they differ, KV data is updated.
 func (t *ConsulTarget) shouldUpdateKV(es *ExportedService) (bool, error) {
-	key := t.metadataPrefix(es)
+	key, err := t.metadataPrefix(es)
+	if err != nil {
+		return false, errors.Wrap(err, "error calculating key prefix")
+	}
+
 	qo := capi.QueryOptions{RequireConsistent: true}
 
 	kvPair, _, err := t.kv.Get(key, &qo, []string{"kv:metadata"})

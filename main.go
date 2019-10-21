@@ -59,6 +59,7 @@ func main() {
 	httpIp := viper.GetString("HTTP_IP")
 	httpPort := viper.GetInt("HTTP_PORT")
 	servicesEnabled := viper.GetBool("SERVICES_ENABLED")
+	servicesKeyTemplate := viper.GetString("SERVICES_KEY_TEMPLATE")
 
 	stopTimeout := 10 * time.Second
 	stoppedC := make(chan struct{})
@@ -118,6 +119,7 @@ func main() {
 	targetCfg := controller.ConsulTargetConfig{
 		ConsulConfig:    consulTargetCfg,
 		KvPrefix:        kvPrefix,
+		ServicesKeyTmpl: servicesKeyTemplate,
 		ClusterId:       clusterId,
 		Elector:         elector,
 		ServicesEnabled: servicesEnabled,
