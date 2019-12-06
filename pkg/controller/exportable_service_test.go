@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,9 +23,11 @@ func ServiceFixture() *v1.Service {
 			Ports: []v1.ServicePort{
 				v1.ServicePort{
 					Name:     "http",
+					Port:     80,
 					NodePort: 32123},
 				v1.ServicePort{
 					Name:     "thing",
+					Port:     1234,
 					NodePort: 32124},
 			},
 		},
@@ -167,7 +169,7 @@ func TestId(t *testing.T) {
 		svc := ServiceFixture()
 		svc.Spec.Ports[0].Name = ""
 		es, _ := NewExportedService(svc, "cluster", 0)
-		assert.Equal(t, "cluster-default-service1-32123", es.Id())
+		assert.Equal(t, "cluster-default-service1-80", es.Id())
 	})
 }
 
