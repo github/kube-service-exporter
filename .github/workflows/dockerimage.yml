@@ -17,6 +17,7 @@ jobs:
         if [ "$TAG" = "master" ]; then
           TAG=latest
         fi
+        echo "::set-env name=TAG::$TAG"
 
     - name: log
       run: echo Building image for ${TAG}
