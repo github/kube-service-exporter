@@ -1,0 +1,36 @@
+name: Push Tagged Image
+on:
+  push:
+    tags: [ 'v*' ]
+    branches: [ 'master']
+jobs:
+  build:
+    env:
+      TAG: ""
+    runs-on: ubuntu-latest
+    steps:
+    - name: git checkout
+      uses: actions/checkout@v1
+    - name: generate tag
+      run: |
+        TAG=${GITHUB_REF##*/}
+        if [ "$TAG" = "master" ]; then
+          TAG=latest
+        fi
+        echo "::set-env name=TAG::$TAG"
+
+    - name: log
+      run: echo Building image for ${TAG}
+    - name: Build the Docker image
+      run: |
+        docker build . --file Dockerfile \
+          --tag docker.pkg.github.com/github/kube-service-exporter/kube-service-exporter:${TAG} \
+          --tag github/kube-service-exporter:${TAG}
+    - name: docker login (GitHub)
+      run: docker login docker.pkg.github.com -u "$GITHUB_ACTOR" -p ${{ secrets.GITHUB_TOKEN }}
+    - name: docker push (GitHub)
+      run: docker push docker.pkg.github.com/github/kube-service-exporter/kube-service-exporter:${TAG}
+    - name: docker login (Docker Hub)
+      run: docker login -u "${{ secrets.DOCKER_LOGIN }}" -p "${{ secrets.DOCKER_TOKEN }}"
+    - name: docker push (Docker Hub)
+      run: docker push github/kube-service-exporter:${TAG}
