@@ -1,0 +1,12 @@
+name: Docker Image CI
+on:
+  push:
+    branches: [ '*' ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: git checkout
+      uses: actions/checkout@v1
+    - name: Build
+      run: docker build . --file Dockerfile
