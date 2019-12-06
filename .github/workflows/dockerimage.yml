@@ -5,8 +5,6 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    env:
-      TAG: ""
 
     steps:
     - name: git checkout
