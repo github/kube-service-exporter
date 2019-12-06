@@ -18,7 +18,6 @@ metadata:
   name: kse-example
   labels:
     service: kse-example
-  namespace: kube-system
 spec:
   ports:
   - name: http
