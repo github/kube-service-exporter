@@ -7,7 +7,7 @@ import (
 
 	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -134,7 +134,9 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 	}
 
 	if es.PortName == "" {
-		es.PortName = strconv.Itoa(int(es.Port))
+		// use the container port since it will be consistent across clusters
+		// and the NodePort will not.
+		es.PortName = strconv.Itoa(int(service.Spec.Ports[portIdx].Port))
 	}
 
 	if service.Annotations == nil {
@@ -234,7 +236,7 @@ func (es *ExportedService) MarshalJSON() ([]byte, error) {
 		Hash string `json:"hash"`
 		ExportedServiceMarshal
 	}{
-		Hash: hash,
+		Hash:                   hash,
 		ExportedServiceMarshal: ExportedServiceMarshal(*es),
 	}
 	return json.Marshal(&data)
