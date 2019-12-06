@@ -13,29 +13,37 @@
 ### Install consul on your cluster
 
 ```
-$ kubectl apply -f examples/consul.yaml
+$ kubectl create namespace kse
+$ kubectl apply -f examples/consul.yaml -n kse
 ```
 
-Check for the pod to appear in the `kube-system` namespace:
+Check for the pod to appear in the `kse` namespace:
 
 ```
-$ kubectl get pods -n kube-system | grep consul
+$ kubectl get pods -n kse | grep consul
 consul-64bcfb7c69-qm69n       1/1     Running   0          3d
 ```
 
 ### Install kube-service-exporter
 
-In `example/kube-service-exporter.yaml`, set the `KSE_CLUSTER_ID` environment variable to `value:<your-cluster-name-here>`. In our example, we simply set the cluster name to `minikube`.
+- In `example/kube-service-exporter.yaml`, set the `KSE_CLUSTER_ID` environment variable to `value:<your-cluster-name-here>`. In our example, we simply set the cluster name to `MyClusterId`.
+- In `examples/rbac.yaml` change the ClusterRoleBinding namespace to `kse`:
 
 ```
-$ kubectl apply -f examples/rbac.yaml
-$ kubectl apply -f examples/kube-service-exporter.yaml
+$ sed  -ie 's/%NAMESPACE%/kse/' examples/rbac.yaml
 ```
 
-Check for the pods to appear in the `kube-system` namespace:
+Deploy `kube-service-exporter`
 
 ```
-$ kubectl get pods -n kube-system | grep kube-service-exporter
+$ kubectl apply -f examples/rbac.yaml -n kse
+$ kubectl apply -f examples/kube-service-exporter.yaml -n kse
+```
+
+Check for the pods to appear in the `kse` namespace:
+
+```
+$ kubectl get pods -n kse -l app=kube-service-exporter
 kube-service-exporter-564dd97bcd-x6w6g      1/1     Running   3          3d
 kube-service-exporter-78455495fd-fv5gm      1/1     Running   3          3d
 ```
@@ -44,7 +52,7 @@ kube-service-exporter-78455495fd-fv5gm      1/1     Running   3          3d
 
 Exec into the consul pod:
 ```
-$ kubectl exec -it consul-64bcfb7c69-l7lb9 -- sh
+$ kubectl exec -it consul-64bcfb7c69-l7lb9 -n kse -- sh
 / # consul kv get -recurse
 kube-service-exporter/leadership/minikube-leader:kube-service-exporter-564dd97bcd-x6w6g
 kube-service-exporter/nodes/minikube:[{"Name":"minikube","Address":"10.0.2.15"}]
@@ -55,13 +63,13 @@ kube-service-exporter/nodes/minikube:[{"Name":"minikube","Address":"10.0.2.15"}]
 Similarly to exporting node metadata, kube-service-exporter will also export metadata about Services.
 
 ```
-$ kubectl apply -f examples/service.yaml
+$ kubectl apply -f examples/service.yaml -n kse
 ```
 
 Exec into the Consul pod to see the result:
 
 ```
-$ kubectl exec -it consul-64bcfb7c69-l7lb9 -- sh
+$ kubectl exec -it consul-64bcfb7c69-l7lb9 -n kse -- sh
 / # consul kv get -recurse
 kube-service-exporter/leadership/minikube-leader:kube-service-exporter-564dd97bcd-x6w6g
 kube-service-exporter/nodes/minikube:[{"Name":"minikube","Address":"10.0.2.15"}]
@@ -69,6 +77,5 @@ kube-service-exporter/services/kube-system-kse-example-http/clusters/minikube:{"
 ```
 
 You now can use the new key/value pair to configure your external load balancer using `consul-template` (example pending).
-
 
 

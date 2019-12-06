@@ -28,4 +28,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: kube-service-exporter
-  namespace: {{ NAMESPACE }}
+  namespace: %NAMESPACE%
