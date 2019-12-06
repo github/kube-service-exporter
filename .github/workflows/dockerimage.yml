@@ -5,13 +5,13 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    env:
+      TAG: ""
 
     steps:
     - name: git checkout
       uses: actions/checkout@v1
     - name: generate tag
-      env:
-        TAG: ""
       run: |
         TAG=${GITHUB_REF##/}
         if [ "$TAG" = "master" ]; then
