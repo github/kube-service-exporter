@@ -27,36 +27,41 @@
 
 [[constraint]]
   name = "github.com/hashicorp/consul"
-  version = "1.0.6"
+  version = "1.6.1"
 
 [[constraint]]
   name = "github.com/spf13/viper"
-  version = "1.0.0"
+  version = "1.6.1"
 
 [[constraint]]
   name = "github.com/stretchr/testify"
-  version = "1.2.1"
+  version = "1.4.0"
 
 [[constraint]]
   name = "k8s.io/api"
-  version = "kubernetes-1.9.0-beta.2"
+  version = "kubernetes-1.15.0"
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  version = "kubernetes-1.9.0"
+  version = "kubernetes-1.15.0"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "6.0.0"
+  version = "v12.0.0"
 
 [[constraint]]
   name = "github.com/pkg/errors"
-  version = "v0.8.0"
+  version = "v0.8.1"
 
 [[constraint]]
   name = "github.com/mitchellh/hashstructure"
   revision = "2bca23e0e452137f789efbc8610126fd8b94f73b"
 
+[[constraint]]
+  name = "github.com/DataDog/datadog-go"
+  version = "=2.1.0"
+
 [prune]
   go-tests = true
   unused-packages = true
+  non-go = true
