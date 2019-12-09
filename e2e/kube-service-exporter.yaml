@@ -40,7 +40,9 @@ spec:
               command: ["sleep", "5"]
         env:
         - name: KSE_CONSUL_HOST
-          value: consul # this references the consul Service in your cluster
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: KSE_POD_NAME
           valueFrom:
             fieldRef:
@@ -48,4 +50,4 @@ spec:
         - name: KSE_SERVICES_ENABLED
           value: "true"
         - name: KSE_CLUSTER_ID
-          value: "minikube"
+          value: $CLUSTER_ID

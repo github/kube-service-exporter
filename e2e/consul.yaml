@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    run: consul
+  name: consul
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      run: consul
+  template:
+    metadata:
+      labels:
+        run: consul
+    spec:
+      hostNetwork: true
+      containers:
+      - image: consul
+        imagePullPolicy: Always
+        name: consul
+        args: 
+        - agent
+        - -join=$CONSUL_IP
+        - -bind={{ GetInterfaceIP "eth0" }}
+        - -client={{ GetInterfaceIP "eth0" }}
+        - -advertise={{ GetInterfaceIP "eth0" }}
+        - -rejoin
+        - -retry-join={{ GetInterfaceIP "eth0" }}
+        ports:
+        - containerPort: 8500
+          protocol: TCP
