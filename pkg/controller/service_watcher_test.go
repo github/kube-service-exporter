@@ -3,12 +3,13 @@ package controller
 import (
 	"io/ioutil"
 	"log"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -37,6 +38,7 @@ type fakeTarget struct {
 	Store  []*ExportedService
 	Nodes  map[string]ExportedNode
 	EventC chan string
+	mutex  sync.RWMutex
 }
 
 func NewFakeTarget() *fakeTarget {
@@ -50,14 +52,18 @@ func (t *fakeTarget) Create(es *ExportedService) (bool, error) {
 		return false, nil
 	}
 
+	t.mutex.Lock()
 	t.Store = append(t.Store, es)
+	t.mutex.Unlock()
 	t.EventC <- "create"
 	return true, nil
 }
 
 func (t *fakeTarget) Update(es *ExportedService) (bool, error) {
 	if idx, ok := t.find(es); ok {
+		t.mutex.Lock()
 		t.Store[idx] = es
+		t.mutex.Unlock()
 		t.EventC <- "update"
 		return true, nil
 	}
@@ -65,8 +71,11 @@ func (t *fakeTarget) Update(es *ExportedService) (bool, error) {
 }
 
 func (t *fakeTarget) Delete(es *ExportedService) (bool, error) {
+
 	if idx, ok := t.find(es); ok {
+		t.mutex.Lock()
 		t.Store = append(t.Store[:idx], t.Store[idx+1:]...)
+		t.mutex.Unlock()
 		t.EventC <- "delete"
 		return true, nil
 	}
@@ -90,12 +99,25 @@ func (t *fakeTarget) WriteNodes(nodes []*v1.Node) error {
 		}
 	}
 
+	t.mutex.Lock()
 	t.Nodes = exportedNodes
+	t.mutex.Unlock()
+
 	t.EventC <- "write_nodes"
 	return nil
 }
 
+// GetNodes prevents race conditions when evaluating t.Nodes in tests
+func (t *fakeTarget) GetNodes() map[string]ExportedNode {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+	return t.Nodes
+}
+
 func (t *fakeTarget) find(es *ExportedService) (int, bool) {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
 	for i, val := range t.Store {
 		if val.Id() == es.Id() {
 			return i, true

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -97,9 +97,9 @@ func (s *NodeWatcherSuite) TestAddNodes() {
 		if test.add {
 			val := chanRecvWithTimeout(s.T(), s.target.EventC)
 			s.Equal("write_nodes", val)
-			s.Contains(s.target.Nodes, test.node.Name)
+			s.Contains(s.target.GetNodes(), test.node.Name)
 		} else {
-			s.NotContains(s.target.Nodes, test.node.Name)
+			s.NotContains(s.target.GetNodes(), test.node.Name)
 		}
 	}
 }
@@ -111,12 +111,12 @@ func (s *NodeWatcherSuite) TestUpdateNodes() {
 
 	val := chanRecvWithTimeout(s.T(), s.target.EventC)
 	s.Equal("write_nodes", val)
-	s.Contains(s.target.Nodes, node.Name)
+	s.Contains(s.target.GetNodes(), node.Name)
 
 	_, err = s.ic.ClientSet.CoreV1().Nodes().Update(&node)
 	require.NoError(s.T(), err)
 	s.Equal("write_nodes", val)
-	s.Contains(s.target.Nodes, node.Name)
+	s.Contains(s.target.GetNodes(), node.Name)
 }
 
 // The Delete here doesn't appear to be triggering the Watch, so this is commented
@@ -128,15 +128,15 @@ func (s *NodeWatcherSuite) xTestDeleteNodes() {
 
 	val := chanRecvWithTimeout(s.T(), s.target.EventC)
 	s.Equal("write_nodes", val)
-	s.Contains(s.target.Nodes, node.Name)
+	s.Contains(s.target.GetNodes(), node.Name)
 
 	err = s.ic.ClientSet.CoreV1().Nodes().Delete(node.Name, &meta_v1.DeleteOptions{})
 	require.NoError(s.T(), err)
 
 	val = chanRecvWithTimeout(s.T(), s.target.EventC)
 	s.Equal("write_nodes", val)
-	s.NotContains(s.target.Nodes, node.Name)
-	fmt.Println(s.target.Nodes)
+	s.NotContains(s.target.GetNodes(), node.Name)
+	fmt.Println(s.target.GetNodes())
 }
 
 func (s *NodeWatcherSuite) TestNodeReady() {
