@@ -1,11 +1,13 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: kube-system
   name: kube-service-exporter
   labels:
-    k8s-app: kube-service-exporter
+    app: kube-service-exporter
 spec:
+  selector:
+    matchLabels:
+      app: kube-service-exporter
   replicas: 2
   strategy:
     rollingUpdate:
@@ -14,12 +16,12 @@ spec:
   template:
     metadata:
       labels:
-        k8s-app: kube-service-exporter
+        app: kube-service-exporter
     spec:
       serviceAccountName: kube-service-exporter
       containers:
       - name: kube-service-exporter
-        image: github/kube-service-exporter:ceb932bbe250bd146efce5cda90ff40df566b90f
+        image: github/kube-service-exporter:v0.1.2
         resources:
           requests:
             cpu: "50m"
@@ -50,4 +52,4 @@ spec:
         - name: KSE_SERVICES_ENABLED
           value: "false"
         - name: KSE_CLUSTER_ID
-          value: "minikube"
+          value: "MyClusterID"
