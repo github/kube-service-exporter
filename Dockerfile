@@ -1,9 +1,9 @@
-FROM golang:1.10-stretch as builder
+FROM golang:1.13-buster as builder
 
-ARG CONSUL_URL="https://releases.hashicorp.com/consul/1.0.6/consul_1.0.6_linux_amd64.zip"
-ARG CONSUL_SHA="bcc504f658cef2944d1cd703eda90045e084a15752d23c038400cf98c716ea01"
+ARG CONSUL_URL="https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip"
+ARG CONSUL_SHA="a8568ca7b6797030b2c32615b4786d4cc75ce7aee2ed9025996fe92b07b31f7e"
 RUN apt-get update && \
-    apt-get install -y \
+      apt-get install -y \
       git \
       unzip
 RUN curl -s "$CONSUL_URL" -o /tmp/consul.zip && \
@@ -15,6 +15,6 @@ COPY . .
 COPY .git .
 RUN make
 
-FROM debian:stretch-slim 
+FROM debian:buster-slim
 COPY --from=builder /go/src/github.com/github/kube-service-exporter/bin/kube-service-exporter /usr/local/bin
 ENTRYPOINT ["/usr/local/bin/kube-service-exporter"]
