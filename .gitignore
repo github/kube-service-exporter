@@ -2,3 +2,4 @@ bin/
 coverage.out
 tmp/
 .licenses
+Brewfile.lock.json

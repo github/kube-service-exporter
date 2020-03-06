@@ -59,7 +59,7 @@ func (t *fakeTarget) Create(es *ExportedService) (bool, error) {
 	return true, nil
 }
 
-func (t *fakeTarget) Update(es *ExportedService) (bool, error) {
+func (t *fakeTarget) Update(old *ExportedService, es *ExportedService) (bool, error) {
 	if idx, ok := t.find(es); ok {
 		t.mutex.Lock()
 		t.Store[idx] = es

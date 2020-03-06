@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/github/kube-service-exporter/pkg/consul"
 	"github.com/github/kube-service-exporter/pkg/leader"
@@ -123,8 +123,42 @@ func (t *ConsulTarget) Create(es *ExportedService) (bool, error) {
 	return true, nil
 }
 
-func (t *ConsulTarget) Update(es *ExportedService) (bool, error) {
-	return t.Create(es)
+// Update will update the representation of the ExportedService in Consul,
+// cleaning up old keys if the old key differs from the new key.
+// returns true when the key was created, false otherwise
+func (t *ConsulTarget) Update(old *ExportedService, new *ExportedService) (bool, error) {
+	created, err := t.Create(new)
+	if err != nil {
+		return false, errors.Wrap(err, "error creating new key")
+	}
+
+	if _, err := t.clean(old, new); err != nil {
+		return created, errors.Wrap(err, "error deleting old/changed key")
+	}
+
+	return created, err
+}
+
+// clean will clean up the old key if the key value changed as part of an update
+// returns true if the old key was removed, false otherwise
+func (t *ConsulTarget) clean(old *ExportedService, new *ExportedService) (bool, error) {
+	if old == nil {
+		return false, nil
+	}
+
+	// ignore metadataPrefix errors here because:
+	// * we don't want to output an error because not being able to calculate
+	//   the _old_ prefix
+	// * the new prefix was _just_ calculated up in Create above, so it's
+	//   redundant
+	oldPrefix, _ := t.metadataPrefix(old)
+	newPrefix, _ := t.metadataPrefix(new)
+
+	if oldPrefix == newPrefix {
+		return false, nil
+	}
+
+	return t.Delete(old)
 }
 
 func (t *ConsulTarget) Delete(es *ExportedService) (bool, error) {

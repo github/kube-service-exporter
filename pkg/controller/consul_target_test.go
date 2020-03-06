@@ -9,9 +9,10 @@ import (
 	"github.com/github/kube-service-exporter/pkg/leader"
 	"github.com/github/kube-service-exporter/pkg/tests"
 	capi "github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -185,6 +186,45 @@ func (s *ConsulTargetSuite) TestCreate() {
 		err = json.Unmarshal(pair.Value, &meta)
 		s.NoError(err)
 		s.Equal(meta["load_balancer_class"], "internal")
+	})
+}
+func (s *ConsulTargetSuite) TestUpdate() {
+	s.T().Run("changing key deletes old key", func(t *testing.T) {
+		target, _ := NewConsulTarget(newDefaultConsulTargetConfig(s.consulServer))
+		target.servicesKeyTmpl = "{{ .LoadBalancerClass }}/{{ id }}"
+
+		old := &ExportedService{
+			ClusterId:         ClusterId,
+			Namespace:         "ns1",
+			Name:              "name1",
+			PortName:          "http",
+			LoadBalancerClass: "internal",
+			Port:              32001,
+		}
+
+		new := &ExportedService{
+			ClusterId:         old.ClusterId,
+			Namespace:         old.Namespace,
+			Name:              old.Name,
+			PortName:          old.PortName,
+			LoadBalancerClass: "external",
+			Port:              old.Port,
+		}
+
+		kv := s.consulServer.Client.KV()
+		ok, err := target.Create(old)
+		require.NoError(t, err)
+		assert.True(t, ok)
+
+		oldkey := fmt.Sprintf("%s/services/%s/%s/clusters/%s", KvPrefix, old.LoadBalancerClass, old.Id(), old.ClusterId)
+		pair, _, err := kv.Get(oldkey, &capi.QueryOptions{})
+		require.NoError(t, err)
+		require.NotNilf(t, pair, "expected KVPair for %s to be not nil", oldkey)
+
+		ok, err = target.Update(old, new)
+		pair, _, err = kv.Get(oldkey, &capi.QueryOptions{})
+		require.NoError(t, err)
+		assert.Nil(t, pair)
 	})
 }
 
