@@ -1,1 +1,2 @@
+brew "consul"
 cask "docker"

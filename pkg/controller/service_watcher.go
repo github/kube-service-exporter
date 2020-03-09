@@ -8,7 +8,7 @@ import (
 	"github.com/github/kube-service-exporter/pkg/stats"
 	"github.com/github/kube-service-exporter/pkg/util"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
@@ -176,12 +176,22 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 
 	newIds := make(map[string]bool)
 
+	oldExportedServices, _ := NewExportedServicesFromKubeService(oldService, sw.clusterId)
 	newExportedServices, _ := NewExportedServicesFromKubeService(newService, sw.clusterId)
 	for _, es := range newExportedServices {
+		// attempt to figure out which service this used to be to help reduce
+		// the probability for orphans occurring. For the consul target, if both
+		// the PortName AND Consul key name change at the same time AND there
+		// is more than one port in the K8s Service, then orphans are
+		// unavoidable.
+		oldES := sw.matchingExportedService(oldExportedServices, es)
+		if oldES == nil && len(oldExportedServices) == 1 && len(newExportedServices) == 1 {
+			oldES = oldExportedServices[0]
+		}
+
 		newIds[es.Id()] = true
 		log.Printf("Update service %s", es.Id())
-
-		_, err := target.Update(es)
+		_, err := target.Update(oldES, es)
 		stats.IncrSuccessOrFail(err, "target.service", []string{"handler:update", "service:" + es.Id()})
 		if err != nil {
 			log.Printf("Error updating %+v", es)
@@ -191,13 +201,24 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 	// delete ExportedServices that are in old, but not new (by Id)
 	// This should cover renaming the port name, or a change in other metadata
 	// such as ServicePerCluster
-	oldExportedServices, _ := NewExportedServicesFromKubeService(oldService, sw.clusterId)
 	for _, es := range oldExportedServices {
 		if _, ok := newIds[es.Id()]; !ok {
 			log.Printf("Delete service %+v due to Id change", es)
 			target.Delete(es)
 		}
 	}
+}
+
+// matchingExportedService finds and returns the matching ExportedService within
+// a list and returns it. An ExportedService is considered matching if the
+// calculated IDs match. Returns nil if no match
+func (sw *ServiceWatcher) matchingExportedService(list []*ExportedService, es *ExportedService) *ExportedService {
+	for i := range list {
+		if es.Id() == list[i].Id() {
+			return list[i]
+		}
+	}
+	return nil
 }
 
 func (sw *ServiceWatcher) deleteService(service *v1.Service, target ExportTarget) {
