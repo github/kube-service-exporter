@@ -196,17 +196,13 @@ func TestJSON(t *testing.T) {
 	es, _ := NewExportedService(ServiceFixture(), "cluster", 0)
 	b, err := json.Marshal(es)
 	assert.NoError(t, err)
-	expected := `{ "health_check_path": "",
+	expected := `{ "service_per_cluster": true,
 					"health_check_port": 32123,
-					"proxy_protocol": false,
-					"load_balancer_listen_port": 0,
-					"hash": "da96e1c925945147",
+					"hash": "b2e9f54c0b6f432b",
 					"ClusterName": "cluster",
 					"port": 32123,
-					"dns_name": "",
-					"backend_protocol": "http",
 					"custom_attrs": {},
-					"load_balancer_class": "" }`
+					"backend_protocol": "http" }`
 
 	assert.JSONEq(t, expected, string(b))
 }

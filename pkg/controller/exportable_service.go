@@ -60,29 +60,35 @@ type ExportedService struct {
 	// The Port on which the Service is reachable
 	Port int32 `json:"port"`
 
-	DNSName           string `json:"dns_name"`
-	ServicePerCluster bool   `json:"-"`
+	DNSName           string `json:"dns_name,omitempty"`
+	ServicePerCluster bool   `json:"service_per_cluster,omitempty"`
 
 	// an optional URI Path for the HealthCheck
-	HealthCheckPath string `json:"health_check_path"`
+	HealthCheckPath string `json:"health_check_path,omitempty"`
 
 	// HealthCheckPort is a port for the Health Check. Defaults to the NodePort
-	HealthCheckPort int32 `json:"health_check_port"`
+	HealthCheckPort int32 `json:"health_check_port,omitempty"`
 
 	// TCP / HTTP
-	BackendProtocol string `json:"backend_protocol"`
+	BackendProtocol string `json:"backend_protocol,omitempty"`
 
 	// Enable Proxy protocol on the backend
-	ProxyProtocol bool `json:"proxy_protocol"`
+	ProxyProtocol bool `json:"proxy_protocol,omitempty"`
 
 	// LoadBalancerClass can be used to target the service at a specific load
 	// balancer (e.g. "internal", "public"
-	LoadBalancerClass string `json:"load_balancer_class"`
+	LoadBalancerClass string `json:"load_balancer_class,omitempty"`
 
 	// the port the load balancer should listen on
-	LoadBalancerListenPort int32 `json:"load_balancer_listen_port"`
+	LoadBalancerListenPort int32 `json:"load_balancer_listen_port,omitempty"`
 
 	CustomAttrs map[string]interface{} `json:"custom_attrs"`
+
+	// Version is a version specifier that can be used to force the Hash function
+	// to change and thus rewrite the service metadata. This is useful in cases
+	// where the JSON serialization of the object changes, but not the struct
+	// itself.
+	Version int `json:"-"`
 }
 
 // NewExportedServicesFromKubeService returns a slice of ExportedServices, one
@@ -131,6 +137,7 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 		ServicePerCluster: true,
 		BackendProtocol:   "http",
 		ClusterId:         clusterId,
+		Version:           1,
 	}
 
 	if es.PortName == "" {
