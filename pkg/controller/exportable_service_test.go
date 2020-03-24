@@ -198,7 +198,7 @@ func TestJSON(t *testing.T) {
 	assert.NoError(t, err)
 	expected := `{ "service_per_cluster": true,
 					"health_check_port": 32123,
-					"hash": "da96e1c925945147",
+					"hash": "b2e9f54c0b6f432b",
 					"ClusterName": "cluster",
 					"port": 32123,
 					"custom_attrs": {},

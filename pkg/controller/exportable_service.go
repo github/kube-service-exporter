@@ -83,6 +83,12 @@ type ExportedService struct {
 	LoadBalancerListenPort int32 `json:"load_balancer_listen_port,omitempty"`
 
 	CustomAttrs map[string]interface{} `json:"custom_attrs"`
+
+	// Version is a version specifier that can be used to force the Hash function
+	// to change and thus rewrite the service metadata. This is useful in cases
+	// where the JSON serialization of the object changes, but not the struct
+	// itself.
+	Version int `json:"-"`
 }
 
 // NewExportedServicesFromKubeService returns a slice of ExportedServices, one
@@ -131,6 +137,7 @@ func NewExportedService(service *v1.Service, clusterId string, portIdx int) (*Ex
 		ServicePerCluster: true,
 		BackendProtocol:   "http",
 		ClusterId:         clusterId,
+		Version:           1,
 	}
 
 	if es.PortName == "" {
