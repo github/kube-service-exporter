@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
 	"sync"
@@ -149,7 +150,7 @@ func (s *ServiceWatcherSuite) SetupTest() {
 
 	require.NoError(s.T(), err)
 
-	s.ic.ClientSet.CoreV1().Namespaces().Create(ns)
+	s.ic.ClientSet.CoreV1().Namespaces().Create(context.TODO(), ns, meta_v1.CreateOptions{})
 	s.target = NewFakeTarget()
 
 	s.sw = NewServiceWatcher(s.ic, []string{ns.Name}, "cluster", s.target)

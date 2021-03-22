@@ -1,4 +1,4 @@
-FROM golang:1.13-buster as builder
+FROM golang:1.16-buster as builder
 
 ARG CONSUL_URL="https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip"
 ARG CONSUL_SHA="a8568ca7b6797030b2c32615b4786d4cc75ce7aee2ed9025996fe92b07b31f7e"
