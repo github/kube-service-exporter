@@ -10,11 +10,11 @@ RUN curl -s "$CONSUL_URL" -o /tmp/consul.zip && \
       echo "$CONSUL_SHA /tmp/consul.zip" | sha256sum -c && \
       unzip /tmp/consul.zip -d /usr/local/bin
 
-WORKDIR /go/src/github.com/github/kube-service-exporter
+WORKDIR /src/kube-service-exporter
 COPY . .
 COPY .git .
 RUN make
 
 FROM debian:buster-slim
-COPY --from=builder /go/src/github.com/github/kube-service-exporter/bin/kube-service-exporter /usr/local/bin
+COPY --from=builder /src/kube-service-exporter/bin/kube-service-exporter /usr/local/bin
 ENTRYPOINT ["/usr/local/bin/kube-service-exporter"]
