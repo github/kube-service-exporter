@@ -168,7 +168,8 @@ func (sw *ServiceWatcher) updateService(oldService *v1.Service, newService *v1.S
 	stats.Client().Incr("kubernetes.service_handler", tags, 1)
 	defer stats.Client().Timing("kubernetes.service_handler.time", time.Since(start), tags, 1)
 
-	// Delete services that are not exportable (because they aren't LoadBalancer/opt-in)
+	// Delete services that are not exportable (because they aren't
+	// LoadBalancer, NodePort, or opt-in)
 	if !IsExportableService(newService) {
 		// delete the
 		sw.deleteService(oldService, target)
