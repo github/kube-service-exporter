@@ -217,6 +217,11 @@ func (es *ExportedService) Hash() (string, error) {
 	return strconv.FormatUint(hash, 16), nil
 }
 
+// IsExportableService returns true if:
+// - the target Service has the kube-service-exporter.github.com/exported
+//   annotation set to a value which evalutes to a boolean (e.g. "true", "1")
+// AND
+// - is a type: LoadBalancer or type: NodePort Service.
 func IsExportableService(service *v1.Service) bool {
 	var exported bool
 
@@ -227,7 +232,13 @@ func IsExportableService(service *v1.Service) bool {
 		}
 		exported = parsed
 	}
-	return exported && service.Spec.Type == v1.ServiceTypeLoadBalancer
+
+	if !exported {
+		return false
+	}
+
+	return service.Spec.Type == v1.ServiceTypeLoadBalancer ||
+		service.Spec.Type == v1.ServiceTypeNodePort
 }
 
 func (es *ExportedService) MarshalJSON() ([]byte, error) {

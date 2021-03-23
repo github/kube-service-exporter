@@ -219,7 +219,7 @@ func (s *ServiceWatcherSuite) TestUpdateTriggersDelete() {
 	svc := *s.serviceFixture
 	s.SourceExec(s.source.Add, &svc, []string{"create"})
 	s.Len(s.target.Store, 2)
-	svc.Spec.Type = "NodePort"
+	svc.Spec.Type = v1.ServiceTypeClusterIP
 	s.SourceExec(s.source.Modify, &svc, []string{"delete"})
 	s.Len(s.target.Store, 0)
 }

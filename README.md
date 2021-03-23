@@ -4,7 +4,7 @@ A Kubernetes controller for enabling load balancing *across multiple clusters*, 
 
 By exporting Kubernetes Service and Node metadata to Consul, `kube-service-exporter` facilitates bringing an external load balancer to Kubernetes installations for highly available cluster designs.
 
-## Overview 
+## Overview
 
 Traffic ingress into a Kubernetes cluster from on-prem or custom load balancers is complex. Commonly, Ingress controllers are used to support this use case, but  this creates an often unnecessary intermediate proxy and TCP/L4 ingress is still poorly supported. `kube-service-exporter` runs inside the cluster and exports metadata about Kubernetes Services and Nodes to Consul which can be used to configure a custom load balancer according to individual needs.  Services exported by `kube-service-exporter` can be configured to load balance parallel deployments of the same service across multiple Kubernetes clusters, allowing Kubernetes clusters to be highly available. Metadata about the configuration is stored in Annotations on the Service resource which mirror the Service Annotations used when configuring cloud load balancers for providers such as AWS and GCE.
 
@@ -20,7 +20,7 @@ Traffic ingress into a Kubernetes cluster from on-prem or custom load balancers 
 
 ### Services (Consul KV)
 
-Metadata is exported to Consul for Kubernetes Services of `type: LoadBalancer` with the `kube-service-exporter.github.com/exported` annotation set to `"true"`.  The exported metadata for each Kubernetes Service is available at `$KSE_KV_PREFIX/services/$SERVICE_NAME/clusters/$CLUSTER_ID`.  This path warrants some explanation:
+Metadata is exported to Consul for Kubernetes Services of `type: LoadBalancer` or `type: NodePort` with the `kube-service-exporter.github.com/exported` annotation set to `"true"`.  The exported metadata for each Kubernetes Service is available at `$KSE_KV_PREFIX/services/$SERVICE_NAME/clusters/$CLUSTER_ID`.  This path warrants some explanation:
 
 * `KSE_KV_PREFIX` is the value of the `KSE_KV_PREFIX` environment variable passed in and defaults to `kube-service-exporter`.
 * `SERVICE_NAME` is a generated string that uniquely identifies an exported service as `(${CLUSTER_ID}-)${NAMESPACE}-${SERVICE_NAME}-${SERVICE_PORT}`
@@ -131,7 +131,7 @@ When configured to export Consul Services, the Kubernetes Service above would ha
 
 ### Nodes (Consul KV)
 
-Metadata about Kubernetes Nodes in the Kubernetes cluster is stored as a JSON array in Consul KV under `$KSE_KV_PREFIX/nodes/$KSE_CLUSTER_ID`. 
+Metadata about Kubernetes Nodes in the Kubernetes cluster is stored as a JSON array in Consul KV under `$KSE_KV_PREFIX/nodes/$KSE_CLUSTER_ID`.
 
 ```javascript
 $ consul kv get kube-service-exporter/nodes/mycluster
@@ -194,7 +194,7 @@ Exported services are configured with Annotations on the Service, but `kube-serv
 
 Please see an [example deploy here](/examples/deploy-example.md).
 
-### Operation 
+### Operation
 
 ## How To Use
 
@@ -219,4 +219,4 @@ kube-service-exporter is licensed under the [Apache 2.0 license](LICENSE).
 
 `kube-service-exporter` was originally designed and authored by [Aaron Brown](https://github.com/aaronbbrown).
 It is maintained, reviewed, and tested by the Production Engineering team at GitHub.
-Contact the maintainers: opensource+kube-service-exporter@github.com 
+Contact the maintainers: opensource+kube-service-exporter@github.com

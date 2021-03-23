@@ -40,10 +40,16 @@ func TestIsExportableService(t *testing.T) {
 		assert.True(t, IsExportableService(svc))
 	})
 
-	t.Run("NodePort Service is not exportable", func(t *testing.T) {
+	t.Run("ClusterIP Service is not exportable", func(t *testing.T) {
 		svc := ServiceFixture()
-		svc.Spec.Type = "NodePort"
+		svc.Spec.Type = v1.ServiceTypeClusterIP
 		assert.False(t, IsExportableService(svc))
+	})
+
+	t.Run("NodePort Service is exportable", func(t *testing.T) {
+		svc := ServiceFixture()
+		svc.Spec.Type = v1.ServiceTypeNodePort
+		assert.True(t, IsExportableService(svc))
 	})
 
 	t.Run("Service w/out exported annotation is not exportable", func(t *testing.T) {
@@ -139,7 +145,7 @@ func TestNewExportedServicesFromKubeServices(t *testing.T) {
 
 	t.Run("Invalid Service Type", func(t *testing.T) {
 		svc := ServiceFixture()
-		svc.Spec.Type = "NodePort"
+		svc.Spec.Type = v1.ServiceTypeClusterIP
 		_, err := NewExportedServicesFromKubeService(svc, "cluster")
 		assert.Error(t, err)
 	})
