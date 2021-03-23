@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -91,7 +92,7 @@ func (s *NodeWatcherSuite) TestAddNodes() {
 
 	for i, test := range tests {
 		test.node.Name = fmt.Sprintf("%d.example.net", i)
-		_, err := s.ic.ClientSet.CoreV1().Nodes().Create(&test.node)
+		_, err := s.ic.ClientSet.CoreV1().Nodes().Create(context.TODO(), &test.node, meta_v1.CreateOptions{})
 		require.NoError(s.T(), err)
 
 		if test.add {
@@ -106,14 +107,14 @@ func (s *NodeWatcherSuite) TestAddNodes() {
 
 func (s *NodeWatcherSuite) TestUpdateNodes() {
 	node := testingNode()
-	_, err := s.ic.ClientSet.CoreV1().Nodes().Create(&node)
+	_, err := s.ic.ClientSet.CoreV1().Nodes().Create(context.TODO(), &node, meta_v1.CreateOptions{})
 	require.NoError(s.T(), err)
 
 	val := chanRecvWithTimeout(s.T(), s.target.EventC)
 	s.Equal("write_nodes", val)
 	s.Contains(s.target.GetNodes(), node.Name)
 
-	_, err = s.ic.ClientSet.CoreV1().Nodes().Update(&node)
+	_, err = s.ic.ClientSet.CoreV1().Nodes().Update(context.TODO(), &node, meta_v1.UpdateOptions{})
 	require.NoError(s.T(), err)
 	s.Equal("write_nodes", val)
 	s.Contains(s.target.GetNodes(), node.Name)
@@ -123,14 +124,14 @@ func (s *NodeWatcherSuite) TestUpdateNodes() {
 // out for now.
 func (s *NodeWatcherSuite) xTestDeleteNodes() {
 	node := testingNode()
-	_, err := s.ic.ClientSet.CoreV1().Nodes().Create(&node)
+	_, err := s.ic.ClientSet.CoreV1().Nodes().Create(context.TODO(), &node, meta_v1.CreateOptions{})
 	require.NoError(s.T(), err)
 
 	val := chanRecvWithTimeout(s.T(), s.target.EventC)
 	s.Equal("write_nodes", val)
 	s.Contains(s.target.GetNodes(), node.Name)
 
-	err = s.ic.ClientSet.CoreV1().Nodes().Delete(node.Name, &meta_v1.DeleteOptions{})
+	err = s.ic.ClientSet.CoreV1().Nodes().Delete(context.TODO(), node.Name, meta_v1.DeleteOptions{})
 	require.NoError(s.T(), err)
 
 	val = chanRecvWithTimeout(s.T(), s.target.EventC)
