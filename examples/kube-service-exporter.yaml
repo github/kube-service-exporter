@@ -21,7 +21,7 @@ spec:
       serviceAccountName: kube-service-exporter
       containers:
       - name: kube-service-exporter
-        image: github/kube-service-exporter:v0.1.2
+        image: github/kube-service-exporter:latest
         resources:
           requests:
             cpu: "50m"
