@@ -1,8 +1,9 @@
 name: Push Tagged Image
 on:
   push:
-    tags: [ 'v*' ]
-    branches: [ 'master']
+    # tags: [ 'v*' ]
+    # branches: [ 'master']
+    branches: [ '*']
 jobs:
   build:
     env:
